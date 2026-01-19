@@ -1,0 +1,279 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Lightweight RTA</title>
+  <style>
+    html, body { margin:0; height:100%; background:#0b0b0b; color:#ddd; font-family:system-ui, sans-serif; }
+    #top { padding:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; user-select:none; }
+    button, select, input { background:#1a1a1a; color:#ddd; border:1px solid #333; padding:6px 10px; border-radius:8px; }
+    label { display:flex; gap:6px; align-items:center; background:#141414; border:1px solid #333; padding:6px 10px; border-radius:999px; }
+    input[type="checkbox"] { width:16px; height:16px; }
+    canvas { display:block; width:100%; height:calc(100% - 62px); }
+    .label { opacity:0.8; font-size:12px; }
+  </style>
+</head>
+<body>
+  <div id="top">
+    <button id="micBtn">Mic</button>
+    <button id="screenBtn">Screen/Tab audio</button>
+    <button id="stopBtn" disabled>Stop</button>
+
+    <span class="label">FFT</span>
+    <select id="fftSel">
+      <option>1024</option>
+      <option selected>2048</option>
+      <option>4096</option>
+      <option>8192</option>
+    </select>
+
+    <span class="label">Smoothing</span>
+    <input id="smooth" type="range" min="0" max="0.95" step="0.01" value="0.6" />
+
+    <span class="label">dB range</span>
+    <select id="dbSel">
+      <option value="-90,-20">-90..-20</option>
+      <option value="-80,-20" selected>-80..-20</option>
+      <option value="-70,-10">-70..-10</option>
+    </select>
+
+    <span class="label">Scale</span>
+    <select id="scaleSel">
+      <option value="log" selected>Log</option>
+      <option value="lin">Linear</option>
+    </select>
+
+    <label title="Show Hz labels on grid lines">
+      <input id="labelsChk" type="checkbox" checked />
+      <span>Hz labels</span>
+    </label>
+  </div>
+
+  <canvas id="c"></canvas>
+
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx2d = canvas.getContext('2d', { alpha: false });
+
+  const micBtn = document.getElementById('micBtn');
+  const screenBtn = document.getElementById('screenBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const fftSel = document.getElementById('fftSel');
+  const smooth = document.getElementById('smooth');
+  const dbSel = document.getElementById('dbSel');
+  const scaleSel = document.getElementById('scaleSel');
+  const labelsChk = document.getElementById('labelsChk');
+
+  let ac = null, analyser = null, src = null, stream = null, raf = 0;
+  let data = null;
+
+  function resize() {
+    const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+    canvas.width  = Math.floor(canvas.clientWidth  * dpr);
+    canvas.height = Math.floor(canvas.clientHeight * dpr);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  function setupAnalyser() {
+    analyser.fftSize = parseInt(fftSel.value, 10);
+    analyser.smoothingTimeConstant = parseFloat(smooth.value);
+    const [minDb, maxDb] = dbSel.value.split(',').map(Number);
+    analyser.minDecibels = minDb;
+    analyser.maxDecibels = maxDb;
+    data = new Uint8Array(analyser.frequencyBinCount);
+  }
+
+  function stop() {
+    cancelAnimationFrame(raf);
+    raf = 0;
+    if (src) { try { src.disconnect(); } catch {} }
+    if (analyser) { try { analyser.disconnect(); } catch {} }
+    if (stream) { stream.getTracks().forEach(t => t.stop()); }
+    if (ac) { try { ac.close(); } catch {} }
+    ac = analyser = src = stream = null;
+    stopBtn.disabled = true;
+    drawIdle();
+  }
+
+  function drawIdle() {
+    resize();
+    ctx2d.fillStyle = '#0b0b0b';
+    ctx2d.fillRect(0,0,canvas.width,canvas.height);
+    ctx2d.fillStyle = '#666';
+    ctx2d.font = `${Math.floor(canvas.height/18)}px system-ui`;
+    ctx2d.fillText('RTA idle', 20, 50);
+    ctx2d.font = '14px system-ui';
+    ctx2d.fillText('Choose Mic or Screen/Tab audio', 20, 75);
+  }
+
+  function hzToX(hz, sampleRate, w) {
+    const nyq = sampleRate / 2;
+    const mode = scaleSel.value; // 'log' or 'lin'
+    if (mode === 'lin') {
+      return (hz / nyq) * w;
+    }
+    // log mapping: 20 Hz .. Nyquist
+    const fMin = 20;
+    const fMax = nyq;
+    const a = Math.log10(Math.max(fMin, hz));
+    const b = Math.log10(fMax);
+    const c = Math.log10(fMin);
+    return (a - c) / (b - c) * w;
+  }
+
+  function fmtHz(hz) {
+    if (hz >= 1000) {
+      const k = hz / 1000;
+      // 1k, 1.5k, 2k etc (trim trailing .0)
+      const s = (Math.round(k * 10) / 10).toString();
+      return s.endsWith('.0') ? `${s.slice(0,-2)}k` : `${s}k`;
+    }
+    return `${Math.round(hz)}`;
+  }
+
+  function gridFrequencies(sampleRate) {
+    const nyq = sampleRate / 2;
+
+    // Keep grid simple and readable (and light)
+    // Log: classic audio ticks. Linear: slightly denser low-end still ok.
+    const base = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
+    const freqs = base.filter(f => f < nyq);
+
+    // If Nyquist is below 20k (e.g., 22.05k SR => nyq 11.025k) we still show up to nyq-ish
+    // Add nyquist marker if it doesn't align.
+    if (nyq < 20000) {
+      // add 8000/10000 if missing for readability
+      for (const f of [4000, 8000, 10000]) {
+        if (f < nyq && !freqs.includes(f)) freqs.push(f);
+      }
+      freqs.sort((a,b)=>a-b);
+    }
+    return freqs;
+  }
+
+  function draw() {
+    raf = requestAnimationFrame(draw);
+    analyser.getByteFrequencyData(data);
+
+    const w = canvas.width, h = canvas.height;
+    ctx2d.fillStyle = '#0b0b0b';
+    ctx2d.fillRect(0,0,w,h);
+
+    const showLabels = labelsChk.checked;
+
+    // grid
+    ctx2d.strokeStyle = '#1f1f1f';
+    ctx2d.lineWidth = 1;
+    ctx2d.beginPath();
+
+    const freqs = gridFrequencies(ac.sampleRate);
+    for (const hz of freqs) {
+      const x = hzToX(hz, ac.sampleRate, w);
+      ctx2d.moveTo(x, 0);
+      ctx2d.lineTo(x, h);
+    }
+
+    for (let y=0; y<=10; y++) {
+      const yy = (y/10) * h;
+      ctx2d.moveTo(0, yy);
+      ctx2d.lineTo(w, yy);
+    }
+    ctx2d.stroke();
+
+    // labels
+    if (showLabels) {
+      ctx2d.fillStyle = '#6f6f6f';
+      ctx2d.font = '12px system-ui';
+      ctx2d.textAlign = 'center';
+      ctx2d.textBaseline = 'top';
+      for (const hz of freqs) {
+        const x = hzToX(hz, ac.sampleRate, w);
+        // nudge away from edges
+        const xx = Math.max(16, Math.min(w - 16, x));
+        ctx2d.fillText(fmtHz(hz), xx, 6);
+      }
+    }
+
+    // spectrum line
+    ctx2d.strokeStyle = '#d0d0d0';
+    ctx2d.lineWidth = 2;
+    ctx2d.beginPath();
+
+    const binCount = data.length;
+    const nyq = ac.sampleRate / 2;
+
+    for (let i=0; i<binCount; i++) {
+      const hz = (i / binCount) * nyq;
+      const x = hzToX(hz, ac.sampleRate, w);
+
+      // byte 0..255 => map to height
+      const v = data[i] / 255;
+      const y = (1 - v) * h;
+
+      if (i === 0) ctx2d.moveTo(x, y);
+      else ctx2d.lineTo(x, y);
+    }
+    ctx2d.stroke();
+
+    // tiny footer
+    ctx2d.fillStyle = '#777';
+    ctx2d.font = '12px system-ui';
+    ctx2d.textAlign = 'left';
+    ctx2d.textBaseline = 'alphabetic';
+    ctx2d.fillText(`${ac.sampleRate} Hz | ${scaleSel.value.toUpperCase()}`, 10, h - 10);
+  }
+
+  async function startWithStream(s) {
+    stop();
+    stream = s;
+    ac = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = ac.createAnalyser();
+    setupAnalyser();
+
+    // IMPORTANT: don't connect to destination to avoid echo.
+    src = ac.createMediaStreamSource(stream);
+    src.connect(analyser);
+
+    stopBtn.disabled = false;
+    draw();
+  }
+
+  micBtn.addEventListener('click', async () => {
+    const s = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false },
+      video: false
+    });
+    await startWithStream(s);
+  });
+
+  screenBtn.addEventListener('click', async () => {
+    const s = await navigator.mediaDevices.getDisplayMedia({
+      video: true, // required by some browsers to allow audio capture
+      audio: true
+    });
+    await startWithStream(s);
+  });
+
+  stopBtn.addEventListener('click', stop);
+
+  fftSel.addEventListener('change', () => { if (analyser) setupAnalyser(); });
+  smooth.addEventListener('input', () => { if (analyser) analyser.smoothingTimeConstant = parseFloat(smooth.value); });
+  dbSel.addEventListener('change', () => {
+    if (!analyser) return;
+    const [a,b] = dbSel.value.split(',').map(Number);
+    analyser.minDecibels = a;
+    analyser.maxDecibels = b;
+  });
+
+  // these are just display toggles; no heavy re-init needed
+  scaleSel.addEventListener('change', () => {});
+  labelsChk.addEventListener('change', () => {});
+
+  drawIdle();
+})();
+</script>
+</body>
+</html>
