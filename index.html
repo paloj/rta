@@ -3,43 +3,51 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="icon" href="favicon.ico" />
   <title>Lightweight RTA</title>
   <style>
     html, body { margin:0; height:100%; background:#0b0b0b; color:#ddd; font-family:system-ui, sans-serif; }
     #top { padding:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; user-select:none; }
+    #top.hidden { display:none; }
+    .menu-toggle { margin:10px; }
+    .tooltip { position:absolute; padding:4px 8px; background:#101010; color:#f0f0f0; border:1px solid #333; border-radius:4px; font-size:12px; pointer-events:none; white-space:nowrap; transform:translate(-50%, -100%); box-shadow:0 0 10px rgba(0,0,0,0.6); }
+    .tooltip.hidden { display:none; }
     button, select, input { background:#1a1a1a; color:#ddd; border:1px solid #333; padding:6px 10px; border-radius:8px; }
     label { display:flex; gap:6px; align-items:center; background:#141414; border:1px solid #333; padding:6px 10px; border-radius:999px; }
     input[type="checkbox"] { width:16px; height:16px; }
-    canvas { display:block; width:100%; height:calc(100% - 62px); }
+    input[type="number"] { width:92px; }
+    .peak-section { display:flex; gap:10px; align-items:center; }
+    canvas { display:block; width:100%; height:calc(100% - 152px); }
+    .auto-oct-controls { display:flex; gap:10px; align-items:center; }
+    .auto-oct-controls.hidden { display:none; }
+    .hidden { display:none; }
+
+    /* Log panel */
+    #logWrap { padding:10px; border-top:1px solid #222; background:#0a0a0a; height:60px; overflow:auto; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px; }
+    #logWrap.hidden { display:none; }
     .label { opacity:0.8; font-size:12px; }
+    .ok { color:#9ad; }
+    .warn { color:#da9; }
+    .err { color:#f88; }
   </style>
 </head>
 <body>
+  <button id="freezeBtn" class="menu-toggle">Freeze</button>
+  <button id="toggleMenusBtn" class="menu-toggle">Hide menus</button>
   <div id="top">
     <button id="micBtn">Mic</button>
     <button id="screenBtn">Screen/Tab audio</button>
     <button id="stopBtn" disabled>Stop</button>
 
-    <span class="label">FFT</span>
-    <select id="fftSel">
-      <option>1024</option>
-      <option selected>2048</option>
-      <option>4096</option>
-      <option>8192</option>
-    </select>
-
-    <span class="label">Smoothing</span>
-    <input id="smooth" type="range" min="0" max="0.95" step="0.01" value="0.6" />
-
-    <span class="label">dB range</span>
-    <select id="dbSel">
-      <option value="-90,-20">-90..-20</option>
-      <option value="-80,-20" selected>-80..-20</option>
-      <option value="-70,-10">-70..-10</option>
+    <span class="label">View</span>
+    <select id="viewSel" title="Spectrum view">
+      <option value="third" selected>1/3-octave bars</option>
+      <option value="autoOctave">1/x/auto-octave bars</option>
+      <option value="fft">FFT line</option>
     </select>
 
     <span class="label">Scale</span>
-    <select id="scaleSel">
+    <select id="scaleSel" title="Frequency axis scaling">
       <option value="log" selected>Log</option>
       <option value="lin">Linear</option>
     </select>
@@ -48,9 +56,68 @@
       <input id="labelsChk" type="checkbox" checked />
       <span>Hz labels</span>
     </label>
+
+    <span class="label">Min Hz</span>
+    <input id="minHz" type="number" min="0.1" step="0.1" value="10" />
+
+    <span class="label">Max Hz</span>
+    <input id="maxHz" type="number" min="10" step="100" value="15000" />
+
+    <span class="label">FFT</span>
+    <select id="fftSel" title="FFT size (only affects FFT view)">
+      <option>1024</option>
+      <option selected>2048</option>
+      <option>4096</option>
+      <option>8192</option>
+    </select>
+
+    <div id="autoOctControls" class="auto-oct-controls hidden" title="1/x octaves plus auto density">
+      <span class="label">1/x</span>
+      <input id="octaveDivisor" type="number" min="1" max="24" step="1" value="3" />
+      <label title="Automatically add more bars when the selected range is narrow">
+        <input id="octaveAutoChk" type="checkbox" />
+        <span>Auto</span>
+      </label>
+    </div>
+
+    <span class="label">Smoothing</span>
+    <input id="smooth" type="range" min="0" max="0.999" step="0.001" value="0.6" />
+
+    <span class="label">dB range</span>
+    <select id="dbSel">
+      <option value="-90,-20">-90..-20</option>
+      <option value="-80,-20" selected>-80..-20</option>
+      <option value="-70,-10">-70..-10</option>
+    </select>
+
+    <div class="peak-section">
+      <label title="Hold peaks until reset">
+        <input id="peakHoldChk" type="checkbox" />
+        <span>Peek hold</span>
+      </label>
+      <button id="peakResetBtn" type="button">Reset peaks</button>
+    </div>
+    <label title="Load/save preset banks">
+      <span>Presets</span>
+      <select id="bankSel">
+        <option value="">Banks</option>
+        <option value="default">Defaults / Reset</option>
+        <option value="bank-1-load">Load bank 1</option>
+        <option value="bank-2-load">Load bank 2</option>
+        <option value="bank-3-load">Load bank 3</option>
+        <option value="bank-1-save">Save to bank 1</option>
+        <option value="bank-2-save">Save to bank 2</option>
+        <option value="bank-3-save">Save to bank 3</option>
+      </select>
+    </label>
+    <label title="Show/hide error log panel">
+      <input id="logChk" type="checkbox" />
+      <span>Log</span>
+    </label>
   </div>
 
   <canvas id="c"></canvas>
+  <div id="logWrap"></div>
 
 <script>
 (() => {
@@ -60,15 +127,118 @@
   const micBtn = document.getElementById('micBtn');
   const screenBtn = document.getElementById('screenBtn');
   const stopBtn = document.getElementById('stopBtn');
+
+  const viewSel = document.getElementById('viewSel');   // 'third' | 'fft'
+  const scaleSel = document.getElementById('scaleSel'); // 'log' | 'lin'
+  const labelsChk = document.getElementById('labelsChk');
+
+  const minHzEl = document.getElementById('minHz');
+  const maxHzEl = document.getElementById('maxHz');
+
   const fftSel = document.getElementById('fftSel');
   const smooth = document.getElementById('smooth');
   const dbSel = document.getElementById('dbSel');
-  const scaleSel = document.getElementById('scaleSel');
-  const labelsChk = document.getElementById('labelsChk');
 
-  let ac = null, analyser = null, src = null, stream = null, raf = 0;
+  const autoOctControls = document.getElementById('autoOctControls');
+  const octaveDivisorEl = document.getElementById('octaveDivisor');
+  const octaveAutoChk = document.getElementById('octaveAutoChk');
+  const topBar = document.getElementById('top');
+  const toggleMenusBtn = document.getElementById('toggleMenusBtn');
+  const freezeBtn = document.getElementById('freezeBtn');
+  const tooltip = document.createElement('div');
+  tooltip.className = 'tooltip hidden';
+  document.body.appendChild(tooltip);
+  const peakHoldChk = document.getElementById('peakHoldChk');
+  const peakResetBtn = document.getElementById('peakResetBtn');
+
+  const logChk = document.getElementById('logChk');
+  const logWrap = document.getElementById('logWrap');
+  const bankSel = document.getElementById('bankSel');
+
+  const BANK_STORAGE_PREFIX = 'rta-bank-';
+  const DEFAULT_SETTINGS = {
+    view: 'third',
+    scale: 'log',
+    labels: true,
+    minHz: 10,
+    maxHz: 15000,
+    fft: '2048',
+    smoothing: '0.6',
+    dbRange: '-80,-20',
+    octaveDivisor: '3',
+    octaveAuto: false,
+    log: false,
+    peakHold: false
+  };
+
+  let ac = null, analyser = null, src = null;
+  let stream = null;       // original (may contain video)
+  let audioStream = null;  // audio-only stream used by WebAudio
+  let raf = 0;
   let data = null;
 
+  let bandsCacheKey = '';
+  let bands = []; // [{fc, f1, f2, label}...]
+  let menusHidden = false;
+  let peakHoldEnabled = false;
+  let fftPeaks = null;
+  let bandPeaks = null;
+  let isFrozen = false;
+  const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+  // ---------- Logging ----------
+  function nowStr() {
+    const d = new Date();
+    const pad = (n, w=2) => String(n).padStart(w, '0');
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(),3)}`;
+  }
+  function log(msg, cls='ok') {
+    if (!logWrap) return;
+    const div = document.createElement('div');
+    div.className = cls;
+    div.textContent = `[${nowStr()}] ${msg}`;
+    logWrap.appendChild(div);
+    // keep last ~200 lines
+    while (logWrap.childNodes.length > 200) logWrap.removeChild(logWrap.firstChild);
+    logWrap.scrollTop = logWrap.scrollHeight;
+  }
+  function logErr(prefix, e) {
+    const msg = e && e.message ? `${prefix}: ${e.message}` : `${prefix}: ${String(e)}`;
+    log(msg, 'err');
+    if (e && e.stack) log(e.stack, 'err');
+  }
+
+  window.addEventListener('error', (ev) => {
+    log(`window.onerror: ${ev.message} @ ${ev.filename}:${ev.lineno}:${ev.colno}`, 'err');
+    if (ev.error && ev.error.stack) log(ev.error.stack, 'err');
+  });
+  window.addEventListener('unhandledrejection', (ev) => {
+    logErr('unhandledrejection', ev.reason);
+  });
+
+  function updateLogVisibility() {
+    if (!logWrap) return;
+    const shouldShow = logChk.checked && !menusHidden;
+    logWrap.classList.toggle('hidden', !shouldShow);
+  }
+
+  logChk.addEventListener('change', updateLogVisibility);
+
+  function updateFreezeButton() {
+    if (!freezeBtn) return;
+    freezeBtn.textContent = isFrozen ? 'Resume' : 'Freeze';
+  }
+
+  function setFreezeState(enabled) {
+    isFrozen = !!enabled;
+    updateFreezeButton();
+  }
+
+  if (freezeBtn) {
+    freezeBtn.addEventListener('click', () => setFreezeState(!isFrozen));
+  }
+
+  // ---------- Resize ----------
   function resize() {
     const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
     canvas.width  = Math.floor(canvas.clientWidth  * dpr);
@@ -77,27 +247,422 @@
   window.addEventListener('resize', resize);
   resize();
 
+  function hideTooltip() {
+    if (tooltip) tooltip.classList.add('hidden');
+  }
+
+  function handleCanvasHover(ev) {
+    if (!ac || viewSel.value === 'fft') { hideTooltip(); return; }
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.width) { hideTooltip(); return; }
+    const x = clamp(ev.clientX - rect.left, 0, rect.width);
+    const logicalX = (x / rect.width) * canvas.width;
+    const freq = xToHz(logicalX, ac.sampleRate, canvas.width);
+    if (!Number.isFinite(freq) || freq <= 0) { hideTooltip(); return; }
+    tooltip.textContent = `${freqToNoteLabel(freq)} ${fmtHz(freq)}Hz`;
+    tooltip.style.left = `${ev.clientX}px`;
+    tooltip.style.top = `${ev.clientY - 10}px`;
+    tooltip.classList.remove('hidden');
+  }
+
+  canvas.addEventListener('mousemove', handleCanvasHover);
+  canvas.addEventListener('mouseleave', hideTooltip);
+
+  function updateAutoOctControlsVisibility() {
+    if (!autoOctControls) return;
+    const show = viewSel.value === 'autoOctave';
+    autoOctControls.classList.toggle('hidden', !show);
+  }
+
+  function ensureFftPeaks(count) {
+    if (!fftPeaks || fftPeaks.length !== count) {
+      fftPeaks = new Float32Array(count);
+    }
+  }
+
+  function ensureBandPeaks(count) {
+    if (!bandPeaks || bandPeaks.length !== count) {
+      bandPeaks = new Float32Array(count);
+    }
+  }
+
+  function resetPeakHoldData() {
+    fftPeaks = null;
+    bandPeaks = null;
+  }
+
+  function setPeakHold(value) {
+    peakHoldEnabled = !!value;
+    if (!peakHoldEnabled) resetPeakHoldData();
+  }
+
+  function getCurrentSettings() {
+    return {
+      view: viewSel.value,
+      scale: scaleSel.value,
+      labels: labelsChk.checked,
+      minHz: minHzEl.value || DEFAULT_SETTINGS.minHz,
+      maxHz: maxHzEl.value || DEFAULT_SETTINGS.maxHz,
+      fft: fftSel.value,
+      smoothing: smooth.value,
+      dbRange: dbSel.value,
+      octaveDivisor: octaveDivisorEl.value,
+      octaveAuto: octaveAutoChk.checked,
+      log: logChk.checked,
+      peakHold: peakHoldChk ? peakHoldChk.checked : false
+    };
+  }
+
+  function applySettings(settings) {
+    const cfg = { ...DEFAULT_SETTINGS, ...settings };
+    viewSel.value = cfg.view;
+    scaleSel.value = cfg.scale;
+    labelsChk.checked = !!cfg.labels;
+    minHzEl.value = String(cfg.minHz);
+    maxHzEl.value = String(cfg.maxHz);
+    fftSel.value = cfg.fft;
+    smooth.value = String(cfg.smoothing);
+    dbSel.value = cfg.dbRange;
+    if (octaveDivisorEl) octaveDivisorEl.value = String(cfg.octaveDivisor);
+    if (octaveAutoChk) octaveAutoChk.checked = !!cfg.octaveAuto;
+    logChk.checked = !!cfg.log;
+    updateLogVisibility();
+    if (peakHoldChk) {
+      peakHoldChk.checked = !!cfg.peakHold;
+      setPeakHold(peakHoldChk.checked);
+    }
+    if (analyser) setupAnalyser();
+    viewSel.dispatchEvent(new Event('change'));
+  }
+
+  function saveBank(bankNum) {
+    if (typeof localStorage === 'undefined') {
+      log('localStorage unavailable; cannot save bank', 'warn');
+      return;
+    }
+    try {
+      localStorage.setItem(`${BANK_STORAGE_PREFIX}${bankNum}`, JSON.stringify(getCurrentSettings()));
+      log(`Saved settings to bank ${bankNum}`, 'ok');
+    } catch (e) {
+      logErr('Saving bank failed', e);
+    }
+  }
+
+  function loadBank(bankNum) {
+    if (typeof localStorage === 'undefined') {
+      log('localStorage unavailable; cannot load bank', 'warn');
+      return;
+    }
+    const serialized = localStorage.getItem(`${BANK_STORAGE_PREFIX}${bankNum}`);
+    if (!serialized) {
+      log(`Bank ${bankNum} is empty`, 'warn');
+      return;
+    }
+    try {
+      const data = JSON.parse(serialized);
+      applySettings(data);
+      log(`Loaded settings from bank ${bankNum}`, 'ok');
+    } catch (e) {
+      logErr('Loading bank failed', e);
+    }
+  }
+
+  function handleBankAction(action) {
+    if (!action) return;
+    if (action === 'default') {
+      applySettings(DEFAULT_SETTINGS);
+      log('Applied default settings', 'ok');
+      return;
+    }
+    const [bankLabel, bankNum, op] = action.split('-');
+    if (bankLabel !== 'bank') return;
+    const num = Number(bankNum);
+    if (!Number.isFinite(num) || num < 1 || num > 3) return;
+    if (op === 'save') saveBank(num);
+    else if (op === 'load') loadBank(num);
+  }
+
+  if (toggleMenusBtn && topBar) {
+    toggleMenusBtn.addEventListener('click', () => {
+      menusHidden = !menusHidden;
+      topBar.classList.toggle('hidden', menusHidden);
+      toggleMenusBtn.textContent = menusHidden ? 'Show menus' : 'Hide menus';
+      updateLogVisibility();
+    });
+  }
+
+  if (peakHoldChk) {
+    peakHoldChk.addEventListener('change', () => setPeakHold(peakHoldChk.checked));
+  }
+  if (peakResetBtn) {
+    peakResetBtn.addEventListener('click', () => resetPeakHoldData());
+  }
+
+  // ---------- Helpers ----------
+  function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+
+  function getHzLimits(sampleRate) {
+  const nyq = sampleRate / 2;
+
+  let minHz = Number(minHzEl.value);
+  let maxHz = Number(maxHzEl.value);
+
+  if (!Number.isFinite(minHz)) minHz = 10;
+  if (!Number.isFinite(maxHz)) maxHz = 20000;
+
+  // absolute bounds
+  const absMin = 0.1;
+  minHz = clamp(minHz, absMin, nyq);
+  maxHz = clamp(maxHz, 10, nyq);
+
+  if (maxHz <= minHz) {
+    const gap = Math.max(1, minHz * 0.05);
+    maxHz = Math.min(nyq, minHz + gap);
+    if (maxHz <= minHz) maxHz = Math.min(nyq, minHz + 1);
+  }
+
+  return { minHz, maxHz, nyq };
+  }
+
+  function hzToX(hz, sampleRate, w) {
+    const { minHz, maxHz } = getHzLimits(sampleRate);
+    const mode = scaleSel.value; // 'log' or 'lin'
+
+    const f = clamp(hz, minHz, maxHz);
+
+    if (mode === 'lin') {
+      const t = (f - minHz) / (maxHz - minHz);
+      return t * w;
+    }
+
+    // true log mapping with absolute min allowed (>= 0.1 Hz)
+    const fMin = Math.max(0.1, minHz);
+    const fMax = Math.max(fMin * 1.001, maxHz);
+
+    const a = Math.log10(f);
+    const b = Math.log10(fMax);
+    const c = Math.log10(fMin);
+    return (a - c) / (b - c) * w;
+  }
+
+  function xToHz(x, sampleRate, w) {
+    const { minHz, maxHz } = getHzLimits(sampleRate);
+    const mode = scaleSel.value;
+    const ratio = clamp(x / w, 0, 1);
+    if (mode === 'lin') {
+      return minHz + ratio * (maxHz - minHz);
+    }
+
+    const fMin = Math.max(0.1, minHz);
+    const fMax = Math.max(fMin * 1.001, maxHz);
+    const logMin = Math.log10(fMin);
+    const logMax = Math.log10(fMax);
+    const logF = logMin + ratio * (logMax - logMin);
+    return Math.pow(10, logF);
+  }
+
+  function gridFrequencies(sampleRate) {
+    const { minHz, maxHz } = getHzLimits(sampleRate);
+    const base = [10, 20, 30, 50, 80, 100, 200, 300, 500, 800, 1000, 1500, 2000, 3000, 5000, 8000, 10000, 15000, 20000];
+    return base.filter(f => f >= minHz && f <= maxHz);
+  }
+
+  function buildOctaveBands(sampleRate, divisor) {
+    const { minHz, maxHz, nyq } = getHzLimits(sampleRate);
+    const key = `${sampleRate}|${minHz}|${maxHz}|${nyq}|${analyser ? analyser.fftSize : 0}|${divisor}`;
+    if (bandsCacheKey === key) return bands;
+    bandsCacheKey = key;
+
+    const r = Math.pow(2, 1 / divisor);
+    const edge = Math.pow(2, 1 / (divisor * 2));
+    let fc = 1000;
+
+    while (fc > Math.max(minHz, 1e-3)) fc /= r;
+    while (fc < Math.max(minHz, 1e-3)) fc *= r;
+
+    const out = [];
+    for (; fc <= maxHz * 1.0001; fc *= r) {
+      const f1 = fc / edge;
+      const f2 = fc * edge;
+
+      if (f2 < minHz) continue;
+      if (f1 > maxHz) break;
+      if (f1 >= nyq) break;
+
+      out.push({
+        fc,
+        f1: Math.max(f1, minHz),
+        f2: Math.min(f2, Math.min(maxHz, nyq)),
+        label: fmtHz(fc)
+      });
+    }
+    bands = out;
+    return bands;
+  }
+
+  function buildThirdOctaveBands(sampleRate) {
+    return buildOctaveBands(sampleRate, 3);
+  }
+
+  function resolveOctaveDivisor(minHz, maxHz) {
+    let divisor = parseInt(octaveDivisorEl.value, 10);
+    if (!Number.isFinite(divisor) || divisor < 1) divisor = 1;
+    divisor = Math.min(24, divisor);
+
+    if (octaveAutoChk && octaveAutoChk.checked) {
+      const range = Math.max(1, maxHz - minHz);
+      const boost = Math.max(0, Math.round(Math.log2(10000 / range)));
+      const autoTarget = Math.min(24, 3 + boost);
+      divisor = Math.max(divisor, autoTarget);
+    }
+
+    return divisor;
+  }
+
+  function fmtHz(hz, opts = {}) {
+    const roundTo = Math.max(1, opts.roundTo || 1);
+    const rounded = Math.max(roundTo, Math.round(hz / roundTo) * roundTo);
+    if (rounded >= 1000) {
+      const k = rounded / 1000;
+      const s = (Math.round(k * 10) / 10).toString();
+      return s.endsWith('.0') ? `${s.slice(0,-2)}k` : `${s}k`;
+    }
+    return `${rounded}`;
+  }
+
+  function freqToNoteLabel(freq) {
+    if (!Number.isFinite(freq) || freq <= 0) return '??';
+    const ratio = freq / 440;
+    const log2 = typeof Math.log2 === 'function' ? Math.log2(ratio) : Math.log(ratio) / Math.LN2;
+    const note = Math.round(69 + 12 * log2);
+    const octave = Math.floor(note / 12) - 1;
+    const idx = ((note % 12) + 12) % 12;
+    return `${NOTES[idx]}${octave}`;
+  }
+
+  function binToHz(i, binCount, sampleRate) {
+    const nyq = sampleRate / 2;
+    return (i / binCount) * nyq;
+  }
+
+  function bandLevel01(band, sampleRate) {
+    if (!data || !data.length) return 0;
+
+    const binCount = data.length;
+    const nyq = sampleRate / 2;
+
+    const f1 = clamp(band.f1, 0, nyq);
+    const f2 = clamp(band.f2, 0, nyq);
+    if (f2 <= f1) return 0;
+
+    // map to bins
+    const i1 = Math.floor((f1 / nyq) * binCount);
+    const i2 = Math.ceil((f2 / nyq) * binCount);
+
+    const a = clamp(i1, 0, binCount - 1);
+    const b = clamp(i2, 0, binCount);
+
+    let sum = 0;
+    let n = 0;
+    for (let i = a; i < b; i++) { sum += data[i]; n++; }
+    if (n === 0) return 0;
+    return (sum / n) / 255;
+  }
+
+  // ---------- Audio setup ----------
   function setupAnalyser() {
+    if (!analyser) return;
     analyser.fftSize = parseInt(fftSel.value, 10);
     analyser.smoothingTimeConstant = parseFloat(smooth.value);
     const [minDb, maxDb] = dbSel.value.split(',').map(Number);
     analyser.minDecibels = minDb;
     analyser.maxDecibels = maxDb;
     data = new Uint8Array(analyser.frequencyBinCount);
+    bandsCacheKey = '';
+    log(`Analyser: fftSize=${analyser.fftSize}, bins=${analyser.frequencyBinCount}`, 'ok');
+  }
+
+  function attachStreamEndHandlers(s, label) {
+    if (!s) return;
+    const tracks = s.getTracks();
+    tracks.forEach(t => {
+      t.addEventListener('ended', () => {
+        log(`${label} track ended (${t.kind}) -> stopping`, 'warn');
+        stop();
+      });
+    });
   }
 
   function stop() {
-    cancelAnimationFrame(raf);
+    try { cancelAnimationFrame(raf); } catch {}
     raf = 0;
+
     if (src) { try { src.disconnect(); } catch {} }
     if (analyser) { try { analyser.disconnect(); } catch {} }
-    if (stream) { stream.getTracks().forEach(t => t.stop()); }
+    src = null;
+    analyser = null;
+
+    if (audioStream) { try { audioStream.getTracks().forEach(t => t.stop()); } catch {} }
+    audioStream = null;
+
+    if (stream) { try { stream.getTracks().forEach(t => t.stop()); } catch {} }
+    stream = null;
+
     if (ac) { try { ac.close(); } catch {} }
-    ac = analyser = src = stream = null;
+    ac = null;
+
+    data = null;
     stopBtn.disabled = true;
     drawIdle();
+    log('Stopped', 'warn');
   }
 
+  async function startWithStreams(originalStream) {
+    // Defensive: avoid blank page from unhandled exceptions
+    try {
+      stop(); // stop any previous run
+
+      stream = originalStream;
+
+      // Make an audio-only stream for WebAudio (reduces weirdness/crashes with video tracks)
+      const audioTracks = stream.getAudioTracks();
+      if (!audioTracks || audioTracks.length === 0) {
+        log('No audio track received. When sharing a tab, ensure "Share tab audio" is enabled. YT Music sometimes shares video-only if audio isn’t allowed.', 'err');
+        // Keep the original stream stopped so the capture UI doesn’t linger
+        try { stream.getTracks().forEach(t => t.stop()); } catch {}
+        stream = null;
+        return;
+      }
+      audioStream = new MediaStream(audioTracks);
+
+      attachStreamEndHandlers(stream, 'Capture');
+      attachStreamEndHandlers(audioStream, 'Audio');
+
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      log(`AudioContext state=${ac.state}, sampleRate=${ac.sampleRate}`, 'ok');
+
+      analyser = ac.createAnalyser();
+      setupAnalyser();
+
+      // Some browsers start suspended; resume explicitly (still requires user gesture, which we have via click)
+      if (ac.state === 'suspended') {
+        await ac.resume();
+        log(`AudioContext resumed: state=${ac.state}`, 'ok');
+      }
+
+      src = ac.createMediaStreamSource(audioStream);
+      src.connect(analyser);
+
+      stopBtn.disabled = false;
+      draw();
+      log('Started', 'ok');
+    } catch (e) {
+      logErr('startWithStreams failed', e);
+      stop();
+    }
+  }
+
+  // ---------- Drawing ----------
   function drawIdle() {
     resize();
     ctx2d.fillStyle = '#0b0b0b';
@@ -109,62 +674,7 @@
     ctx2d.fillText('Choose Mic or Screen/Tab audio', 20, 75);
   }
 
-  function hzToX(hz, sampleRate, w) {
-    const nyq = sampleRate / 2;
-    const mode = scaleSel.value; // 'log' or 'lin'
-    if (mode === 'lin') {
-      return (hz / nyq) * w;
-    }
-    // log mapping: 20 Hz .. Nyquist
-    const fMin = 20;
-    const fMax = nyq;
-    const a = Math.log10(Math.max(fMin, hz));
-    const b = Math.log10(fMax);
-    const c = Math.log10(fMin);
-    return (a - c) / (b - c) * w;
-  }
-
-  function fmtHz(hz) {
-    if (hz >= 1000) {
-      const k = hz / 1000;
-      // 1k, 1.5k, 2k etc (trim trailing .0)
-      const s = (Math.round(k * 10) / 10).toString();
-      return s.endsWith('.0') ? `${s.slice(0,-2)}k` : `${s}k`;
-    }
-    return `${Math.round(hz)}`;
-  }
-
-  function gridFrequencies(sampleRate) {
-    const nyq = sampleRate / 2;
-
-    // Keep grid simple and readable (and light)
-    // Log: classic audio ticks. Linear: slightly denser low-end still ok.
-    const base = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
-    const freqs = base.filter(f => f < nyq);
-
-    // If Nyquist is below 20k (e.g., 22.05k SR => nyq 11.025k) we still show up to nyq-ish
-    // Add nyquist marker if it doesn't align.
-    if (nyq < 20000) {
-      // add 8000/10000 if missing for readability
-      for (const f of [4000, 8000, 10000]) {
-        if (f < nyq && !freqs.includes(f)) freqs.push(f);
-      }
-      freqs.sort((a,b)=>a-b);
-    }
-    return freqs;
-  }
-
-  function draw() {
-    raf = requestAnimationFrame(draw);
-    analyser.getByteFrequencyData(data);
-
-    const w = canvas.width, h = canvas.height;
-    ctx2d.fillStyle = '#0b0b0b';
-    ctx2d.fillRect(0,0,w,h);
-
-    const showLabels = labelsChk.checked;
-
-    // grid
+  function drawGrid(w, h) {
     ctx2d.strokeStyle = '#1f1f1f';
     ctx2d.lineWidth = 1;
     ctx2d.beginPath();
@@ -175,7 +685,6 @@
       ctx2d.moveTo(x, 0);
       ctx2d.lineTo(x, h);
     }
-
     for (let y=0; y<=10; y++) {
       const yy = (y/10) * h;
       ctx2d.moveTo(0, yy);
@@ -183,78 +692,213 @@
     }
     ctx2d.stroke();
 
-    // labels
-    if (showLabels) {
+    if (labelsChk.checked) {
       ctx2d.fillStyle = '#6f6f6f';
       ctx2d.font = '12px system-ui';
       ctx2d.textAlign = 'center';
       ctx2d.textBaseline = 'top';
       for (const hz of freqs) {
         const x = hzToX(hz, ac.sampleRate, w);
-        // nudge away from edges
         const xx = Math.max(16, Math.min(w - 16, x));
         ctx2d.fillText(fmtHz(hz), xx, 6);
       }
     }
+  }
 
-    // spectrum line
+  function drawFftLine(w, h) {
     ctx2d.strokeStyle = '#d0d0d0';
     ctx2d.lineWidth = 2;
     ctx2d.beginPath();
 
     const binCount = data.length;
-    const nyq = ac.sampleRate / 2;
+    const { minHz, maxHz } = getHzLimits(ac.sampleRate);
+    const isLogScale = scaleSel.value === 'log';
+    const leftX = isLogScale ? hzToX(minHz, ac.sampleRate, w) : 0;
+    if (peakHoldEnabled) ensureFftPeaks(binCount);
+    else fftPeaks = null;
 
+    let started = false;
     for (let i=0; i<binCount; i++) {
-      const hz = (i / binCount) * nyq;
-      const x = hzToX(hz, ac.sampleRate, w);
+      const hz = binToHz(i, binCount, ac.sampleRate);
+      if (hz < minHz || hz > maxHz) continue;
 
-      // byte 0..255 => map to height
+      const x = hzToX(hz, ac.sampleRate, w);
       const v = data[i] / 255;
       const y = (1 - v) * h;
 
-      if (i === 0) ctx2d.moveTo(x, y);
-      else ctx2d.lineTo(x, y);
+      if (peakHoldEnabled && fftPeaks) {
+        fftPeaks[i] = Math.max(fftPeaks[i], v);
+      }
+
+      if (!started) {
+        if (isLogScale && x > leftX) {
+          ctx2d.moveTo(leftX, y);
+          ctx2d.lineTo(x, y);
+        } else {
+          ctx2d.moveTo(x, y);
+        }
+        started = true;
+      } else {
+        ctx2d.lineTo(x, y);
+      }
     }
     ctx2d.stroke();
 
-    // tiny footer
-    ctx2d.fillStyle = '#777';
-    ctx2d.font = '12px system-ui';
-    ctx2d.textAlign = 'left';
-    ctx2d.textBaseline = 'alphabetic';
-    ctx2d.fillText(`${ac.sampleRate} Hz | ${scaleSel.value.toUpperCase()}`, 10, h - 10);
+    if (peakHoldEnabled && fftPeaks) {
+      ctx2d.strokeStyle = '#f7b';
+      ctx2d.lineWidth = 1;
+      ctx2d.beginPath();
+      let startedPeak = false;
+      for (let i=0; i<binCount; i++) {
+        const hz = binToHz(i, binCount, ac.sampleRate);
+        if (hz < minHz || hz > maxHz) continue;
+        const peak = fftPeaks[i];
+        if (!peak) continue;
+        const x = hzToX(hz, ac.sampleRate, w);
+        const y = (1 - peak) * h;
+        if (!startedPeak) {
+          ctx2d.moveTo(x, y);
+          startedPeak = true;
+        } else {
+          ctx2d.lineTo(x, y);
+        }
+      }
+      ctx2d.stroke();
+    }
   }
 
-  async function startWithStream(s) {
-    stop();
-    stream = s;
-    ac = new (window.AudioContext || window.webkitAudioContext)();
-    analyser = ac.createAnalyser();
-    setupAnalyser();
+  function drawOctaveBars(w, h, bandSet, labelStep = 3) {
+    if (!bandSet.length) return;
 
-    // IMPORTANT: don't connect to destination to avoid echo.
-    src = ac.createMediaStreamSource(stream);
-    src.connect(analyser);
+    if (peakHoldEnabled) ensureBandPeaks(bandSet.length);
+    else bandPeaks = null;
 
-    stopBtn.disabled = false;
-    draw();
+    ctx2d.fillStyle = '#d0d0d0';
+    for (let i=0; i<bandSet.length; i++) {
+      const band = bandSet[i];
+      const x1 = hzToX(band.f1, ac.sampleRate, w);
+      const x2 = hzToX(band.f2, ac.sampleRate, w);
+      const bw = Math.max(1, x2 - x1);
+
+      const v = bandLevel01(band, ac.sampleRate);
+      const y = (1 - v) * h;
+
+      if (peakHoldEnabled && bandPeaks) {
+        bandPeaks[i] = Math.max(bandPeaks[i], v);
+      }
+
+      const pad = Math.min(2, bw * 0.15);
+      const xx = x1 + pad;
+      const ww = Math.max(1, bw - pad * 2);
+      ctx2d.fillRect(xx, y, ww, h - y);
+
+      if (peakHoldEnabled && bandPeaks) {
+        const peak = bandPeaks[i];
+        if (peak > 0) {
+          const yPeak = Math.max(0, (1 - peak) * h - 2);
+          ctx2d.fillStyle = '#f7b';
+          ctx2d.fillRect(xx, yPeak, ww, 2);
+          ctx2d.fillStyle = '#d0d0d0';
+        }
+      }
+    }
+
+    if (!labelsChk.checked) return;
+    ctx2d.fillStyle = '#6f6f6f';
+    ctx2d.font = '11px system-ui';
+    ctx2d.textAlign = 'center';
+    ctx2d.textBaseline = 'bottom';
+
+    const step = Math.max(1, labelStep);
+    for (let i=0; i<bandSet.length; i += step) {
+      const band = bandSet[i];
+      const x = hzToX(band.fc, ac.sampleRate, w);
+      const xx = Math.max(16, Math.min(w - 16, x));
+      ctx2d.fillText(fmtHz(band.fc, { roundTo: 10 }), xx, h - 6);
+    }
   }
 
+  function drawThirdOctaveBars(w, h) {
+    const b = buildThirdOctaveBands(ac.sampleRate);
+    const step = (scaleSel.value === 'lin') ? 3 : 4;
+    drawOctaveBars(w, h, b, step);
+  }
+
+  function drawAutoOctaveBars(w, h) {
+    const { minHz, maxHz } = getHzLimits(ac.sampleRate);
+    const divisor = resolveOctaveDivisor(minHz, maxHz);
+    const b = buildOctaveBands(ac.sampleRate, divisor);
+    const step = Math.max(1, Math.floor(divisor / 2));
+    drawOctaveBars(w, h, b, step);
+  }
+
+  function draw() {
+    try {
+      raf = requestAnimationFrame(draw);
+
+      // Guard against race conditions / capture ending
+      if (!analyser || !ac || !data) return;
+      if (!isFrozen) analyser.getByteFrequencyData(data);
+
+      const w = canvas.width, h = canvas.height;
+      ctx2d.fillStyle = '#0b0b0b';
+      ctx2d.fillRect(0,0,w,h);
+
+      drawGrid(w, h);
+
+      if (viewSel.value === 'third') drawThirdOctaveBars(w, h);
+      else if (viewSel.value === 'autoOctave') drawAutoOctaveBars(w, h);
+      else drawFftLine(w, h);
+
+      // footer
+      ctx2d.fillStyle = '#777';
+      ctx2d.font = '12px system-ui';
+      ctx2d.textAlign = 'left';
+      ctx2d.textBaseline = 'alphabetic';
+      const { minHz, maxHz } = getHzLimits(ac.sampleRate);
+      const viewLabel = viewSel.value === 'third' ? '1/3-oct' : viewSel.value === 'autoOctave' ? '1/x-oct' : 'FFT';
+      ctx2d.fillText(
+        `${ac.sampleRate} Hz | ${viewLabel} | ${scaleSel.value.toUpperCase()} | ${Math.round(minHz)}..${Math.round(maxHz)} Hz`,
+        10, h - 10
+      );
+    } catch (e) {
+      logErr('draw() failed', e);
+      stop();
+    }
+  }
+
+  // ---------- UI events ----------
   micBtn.addEventListener('click', async () => {
-    const s = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false },
-      video: false
-    });
-    await startWithStream(s);
+    try {
+      log('Requesting mic...', 'ok');
+      const s = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false },
+        video: false
+      });
+      await startWithStreams(s);
+    } catch (e) {
+      logErr('Mic capture failed', e);
+    }
   });
 
   screenBtn.addEventListener('click', async () => {
-    const s = await navigator.mediaDevices.getDisplayMedia({
-      video: true, // required by some browsers to allow audio capture
-      audio: true
-    });
-    await startWithStream(s);
+    try {
+      log('Requesting screen/tab capture (pick a tab + enable "Share tab audio")...', 'ok');
+
+      // Note: video:true is required by some browsers to allow audio capture from tab/screen
+      const s = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true
+      });
+
+      const aTracks = s.getAudioTracks().length;
+      const vTracks = s.getVideoTracks().length;
+      log(`Capture tracks: audio=${aTracks}, video=${vTracks}`, aTracks ? 'ok' : 'warn');
+
+      await startWithStreams(s);
+    } catch (e) {
+      logErr('Screen/tab capture failed', e);
+    }
   });
 
   stopBtn.addEventListener('click', stop);
@@ -267,12 +911,53 @@
     analyser.minDecibels = a;
     analyser.maxDecibels = b;
   });
+  if (bankSel) {
+    bankSel.addEventListener('change', () => {
+      const action = bankSel.value;
+      if (!action) return;
+      handleBankAction(action);
+      bankSel.value = '';
+    });
+  }
 
-  // these are just display toggles; no heavy re-init needed
-  scaleSel.addEventListener('change', () => {});
-  labelsChk.addEventListener('change', () => {});
+  function invalidateBands() { bandsCacheKey = ''; }
+  minHzEl.addEventListener('input', invalidateBands);
+  maxHzEl.addEventListener('input', invalidateBands);
+  viewSel.addEventListener('change', () => {
+    invalidateBands();
+    updateAutoOctControlsVisibility();
+    if (peakHoldEnabled) resetPeakHoldData();
+    hideTooltip();
+  });
+  if (octaveDivisorEl) octaveDivisorEl.addEventListener('input', invalidateBands);
+  if (octaveAutoChk) octaveAutoChk.addEventListener('change', invalidateBands);
 
+  updateAutoOctControlsVisibility();
+  updateLogVisibility();
   drawIdle();
+  log('Ready', 'ok');
+    setFreezeState(false);
+
+  document.addEventListener('keydown', (ev) => {
+    if (ev.code === 'Space' || ev.key === ' ') {
+      ev.preventDefault();
+      setFreezeState(!isFrozen);
+    }
+  });
+
+  document.addEventListener('wheel', (ev) => {
+    const target = ev.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (target.type !== 'number') return;
+    const step = parseFloat(target.step) || 1;
+    const decimals = Math.max(0, (step.toString().split('.')[1] || '').length);
+    ev.preventDefault();
+    const direction = ev.deltaY > 0 ? -1 : 1;
+    const current = parseFloat(target.value) || 0;
+    const nextValue = Number((current + direction * step).toFixed(decimals));
+    target.value = String(nextValue);
+    target.dispatchEvent(new Event('input', { bubbles: true }));
+  }, { passive: false });
 })();
 </script>
 </body>
