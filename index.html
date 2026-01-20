@@ -7,9 +7,21 @@
   <title>Lightweight RTA</title>
   <style>
     html, body { margin:0; height:100%; background:#0b0b0b; color:#ddd; font-family:system-ui, sans-serif; }
+    body { display:flex; flex-direction:column; }
     #top { padding:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; user-select:none; }
     #top.hidden { display:none; }
     .menu-toggle { margin:10px; }
+    #menuHeader { position:fixed; top:8px; left:8px; z-index:30; padding:0; display:flex; align-items:center; gap:10px; }
+    #menuBtn { margin:0; opacity:0.9; }
+    body.menu-collapsed #menuBtn { opacity:0.35; }
+    #menuPanel { padding:10px; display:flex; gap:10px; flex-wrap:wrap; position:fixed; z-index:20; background:#0f0f0f; border:1px solid #222; border-radius:12px; box-shadow:0 8px 20px rgba(0,0,0,0.45); transform:translateX(-8px); opacity:0; pointer-events:none; transition:transform 160ms ease, opacity 160ms ease; }
+    #menuPanel.hidden { display:none; }
+    #menuPanel.open { transform:translateX(0); opacity:1; pointer-events:auto; }
+    .menu-tab.active { border-color:#6aa; box-shadow:0 0 0 1px rgba(102,170,170,0.4); }
+    .menu-rows { display:flex; flex-direction:column; gap:10px; }
+    .menu-row { padding:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; position:fixed; z-index:10; background:#0d0d0d; border:1px solid #222; border-radius:12px; box-shadow:0 8px 18px rgba(0,0,0,0.45); transform:translateX(-8px); opacity:0; pointer-events:none; transition:transform 160ms ease, opacity 160ms ease; max-height:calc(100vh - 24px); overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
+    .menu-row.hidden { display:none; }
+    .menu-row.open { transform:translateX(0); opacity:1; pointer-events:auto; }
     .tooltip { position:absolute; padding:4px 8px; background:#101010; color:#f0f0f0; border:1px solid #333; border-radius:4px; font-size:12px; pointer-events:none; white-space:nowrap; transform:translate(-50%, -100%); box-shadow:0 0 10px rgba(0,0,0,0.6); }
     .tooltip.hidden { display:none; }
     button, select, input { background:#1a1a1a; color:#ddd; border:1px solid #333; padding:6px 10px; border-radius:8px; }
@@ -17,14 +29,33 @@
     input[type="checkbox"] { width:16px; height:16px; }
     input[type="number"] { width:92px; }
     .peak-section { display:flex; gap:10px; align-items:center; }
-    canvas { display:block; width:100%; height:calc(100% - 152px); }
+    canvas { display:block; width:100%; flex:1 1 0; min-height:0; height:100%; }
     .auto-oct-controls { display:flex; gap:10px; align-items:center; }
     .auto-oct-controls.hidden { display:none; }
+    .style-block { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .style-submenu { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+    .style-block label span,
+    .style-submenu label span { font-size:12px; }
+    .style-group { display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:8px 10px; border:1px solid #262626; border-radius:12px; background:#101010; }
+    .style-group-title { font-size:11px; letter-spacing:0.08em; text-transform:uppercase; opacity:0.6; margin-right:6px; }
+    .help-panel { display:flex; flex-direction:column; gap:8px; max-width:420px; }
+    .help-panel h3 { margin:0; font-size:14px; font-weight:600; }
+    .help-panel ul { margin:0; padding-left:18px; font-size:12px; line-height:1.4; }
+    .help-panel kbd { background:#151515; border:1px solid #333; border-radius:6px; padding:2px 6px; font-size:11px; }
     .hidden { display:none; }
 
     /* Log panel */
-    #logWrap { padding:10px; border-top:1px solid #222; background:#0a0a0a; height:60px; overflow:auto; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px; }
+    #logWrap { padding:10px; border-top:1px solid #222; background:#0a0a0a; height:60px; min-height:60px; max-height:50vh; overflow:auto; resize:vertical; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px; }
     #logWrap.hidden { display:none; }
+    @media (max-width: 768px) {
+      #menuPanel { padding:6px 8px; gap:6px; }
+      .menu-row { padding:8px; gap:6px; border-radius:10px; max-height:calc(100vh - 16px); }
+      .style-group { padding:6px 8px; gap:6px; }
+      button, select, input { padding:4px 8px; border-radius:8px; }
+      label { padding:4px 8px; border-radius:12px; gap:6px; }
+      input[type="number"] { width:78px; }
+      #logWrap { position:fixed; left:0; right:0; bottom:0; height:50vh; max-height:50vh; min-height:40vh; resize:none; z-index:12; box-shadow:0 -10px 24px rgba(0,0,0,0.45); }
+    }
     .label { opacity:0.8; font-size:12px; }
     .ok { color:#9ad; }
     .warn { color:#da9; }
@@ -32,88 +63,224 @@
   </style>
 </head>
 <body>
-  <button id="freezeBtn" class="menu-toggle">Freeze</button>
-  <button id="toggleMenusBtn" class="menu-toggle">Hide menus</button>
-  <div id="top">
-    <button id="micBtn">Mic</button>
-    <button id="screenBtn">Screen/Tab audio</button>
-    <button id="stopBtn" disabled>Stop</button>
-
-    <span class="label">View</span>
-    <select id="viewSel" title="Spectrum view">
-      <option value="third" selected>1/3-octave bars</option>
-      <option value="autoOctave">1/x/auto-octave bars</option>
-      <option value="fft">FFT line</option>
-    </select>
-
-    <span class="label">Scale</span>
-    <select id="scaleSel" title="Frequency axis scaling">
-      <option value="log" selected>Log</option>
-      <option value="lin">Linear</option>
-    </select>
-
-    <label title="Show Hz labels on grid lines">
-      <input id="labelsChk" type="checkbox" checked />
-      <span>Hz labels</span>
-    </label>
-
-    <span class="label">Min Hz</span>
-    <input id="minHz" type="number" min="0.1" step="0.1" value="10" />
-
-    <span class="label">Max Hz</span>
-    <input id="maxHz" type="number" min="10" step="100" value="15000" />
-
-    <span class="label">FFT</span>
-    <select id="fftSel" title="FFT size (only affects FFT view)">
-      <option>1024</option>
-      <option selected>2048</option>
-      <option>4096</option>
-      <option>8192</option>
-    </select>
-
-    <div id="autoOctControls" class="auto-oct-controls hidden" title="1/x octaves plus auto density">
-      <span class="label">1/x</span>
-      <input id="octaveDivisor" type="number" min="1" max="24" step="1" value="3" />
-      <label title="Automatically add more bars when the selected range is narrow">
-        <input id="octaveAutoChk" type="checkbox" />
-        <span>Auto</span>
-      </label>
+  <div id="menuHeader">
+    <button id="menuBtn" class="menu-toggle" aria-expanded="false" aria-label="Toggle menu">☰</button>
+  </div>
+  <div id="menuPanel" class="hidden" role="group" aria-label="Menu rows">
+    <button class="menu-tab" data-row="source" aria-pressed="false">Source</button>
+    <button class="menu-tab" data-row="behaviour" aria-pressed="false">Behaviour</button>
+    <button class="menu-tab" data-row="style" aria-pressed="false">Style</button>
+    <button class="menu-tab" data-row="log" aria-pressed="false">Log</button>
+    <button class="menu-tab" data-row="help" aria-pressed="false" aria-label="Help">?</button>
+  </div>
+  <div id="top" class="menu-rows">
+    <div id="row-source" class="menu-row hidden">
+      <button id="micBtn">Mic</button>
+      <button id="screenBtn">Screen/Tab audio</button>
+      <button id="stopBtn" disabled>Stop</button>
     </div>
-
-    <span class="label">Smoothing</span>
-    <input id="smooth" type="range" min="0" max="0.999" step="0.001" value="0.6" />
-
-    <span class="label">dB range</span>
-    <select id="dbSel">
-      <option value="-90,-20">-90..-20</option>
-      <option value="-80,-20" selected>-80..-20</option>
-      <option value="-70,-10">-70..-10</option>
-    </select>
-
-    <div class="peak-section">
-      <label title="Hold peaks until reset">
-        <input id="peakHoldChk" type="checkbox" />
-        <span>Peek hold</span>
-      </label>
-      <button id="peakResetBtn" type="button">Reset peaks</button>
-    </div>
-    <label title="Load/save preset banks">
-      <span>Presets</span>
-      <select id="bankSel">
-        <option value="">Banks</option>
-        <option value="default">Defaults / Reset</option>
-        <option value="bank-1-load">Load bank 1</option>
-        <option value="bank-2-load">Load bank 2</option>
-        <option value="bank-3-load">Load bank 3</option>
-        <option value="bank-1-save">Save to bank 1</option>
-        <option value="bank-2-save">Save to bank 2</option>
-        <option value="bank-3-save">Save to bank 3</option>
+    <div id="row-behaviour" class="menu-row hidden">
+      <button id="freezeBtn" class="menu-toggle">Freeze</button>
+      <span class="label">View</span>
+      <select id="viewSel" title="Spectrum view">
+        <option value="third" selected>1/3-octave bars</option>
+        <option value="autoOctave">1/x/auto-octave bars</option>
+        <option value="fft">FFT line</option>
       </select>
-    </label>
-    <label title="Show/hide error log panel">
-      <input id="logChk" type="checkbox" />
-      <span>Log</span>
-    </label>
+
+      <span class="label">Scale</span>
+      <select id="scaleSel" title="Frequency axis scaling">
+        <option value="log" selected>Log</option>
+        <option value="lin">Linear</option>
+      </select>
+
+      <span class="label">Min Hz</span>
+      <input id="minHz" type="number" min="0.1" step="0.1" value="50" />
+
+      <span class="label">Max Hz</span>
+      <input id="maxHz" type="number" min="10" step="100" value="15000" />
+
+      <span class="label">FFT</span>
+      <select id="fftSel" title="FFT size (only affects FFT view)">
+        <option>1024</option>
+        <option selected>2048</option>
+        <option>4096</option>
+        <option>8192</option>
+      </select>
+
+      <div id="autoOctControls" class="auto-oct-controls hidden" title="1/x octaves plus auto density">
+        <span class="label">1/x</span>
+        <input id="octaveDivisor" type="number" min="1" max="24" step="1" value="3" />
+        <label title="Automatically add more bars when the selected range is narrow">
+          <input id="octaveAutoChk" type="checkbox" />
+          <span>Auto</span>
+        </label>
+      </div>
+
+      <span class="label">Smoothing</span>
+      <input id="smooth" type="range" min="0" max="0.999" step="0.001" value="0.65" />
+
+      <span class="label">dB range</span>
+      <select id="dbSel">
+        <option value="-90,-20" selected>-90..-20</option>
+        <option value="-80,-20">-80..-20</option>
+        <option value="-70,-10">-70..-10</option>
+      </select>
+
+      <div class="peak-section">
+        <label title="Hold peaks until reset">
+          <input id="peakHoldChk" type="checkbox" />
+          <span>Peek hold</span>
+        </label>
+        <button id="peakResetBtn" type="button">Reset peaks</button>
+      </div>
+      <label title="Load/save preset banks">
+        <span>Presets</span>
+        <select id="bankSel">
+          <option value="">Banks</option>
+          <option value="default">Defaults / Reset</option>
+          <option value="bank-1-load">Load bank 1</option>
+          <option value="bank-2-load">Load bank 2</option>
+          <option value="bank-3-load">Load bank 3</option>
+          <option value="bank-1-save">Save to bank 1</option>
+          <option value="bank-2-save">Save to bank 2</option>
+          <option value="bank-3-save">Save to bank 3</option>
+        </select>
+      </label>
+    </div>
+    <div id="row-style" class="menu-row hidden">
+      <div class="style-block" title="Visual style and color presets">
+        <label title="Style presets">
+          <span>Style</span>
+          <select id="stylePreset">
+            <option value="" selected>Presets</option>
+            <optgroup label="Bars gradient LR">
+              <option value="bars-gradient-lr-light">Bars LR light</option>
+              <option value="bars-gradient-lr-dark">Bars LR dark</option>
+            </optgroup>
+            <optgroup label="Bars gradient UD">
+              <option value="bars-gradient-ud-light">Bars UD light</option>
+              <option value="bars-gradient-ud-dark">Bars UD dark</option>
+            </optgroup>
+            <optgroup label="FFT palette">
+              <option value="fft-light">FFT light</option>
+              <option value="fft-dark">FFT dark</option>
+            </optgroup>
+            <optgroup label="Background">
+              <option value="bg-light">Background light</option>
+              <option value="bg-dark">Background dark</option>
+            </optgroup>
+            <option value="style-reset">Reset defaults</option>
+          </select>
+        </label>
+        <div class="style-submenu">
+          <div class="style-group">
+            <span class="style-group-title">Bars</span>
+            <label title="Bar base color">
+              <span>Bar color</span>
+              <input id="barColor" type="color" value="#d0d0d0" />
+            </label>
+            <label title="Bar gradient start">
+              <span>Bar gradient start</span>
+              <input id="barGradientStart" type="color" value="#d0d0d0" />
+            </label>
+            <label title="Bar gradient end">
+              <span>Bar gradient end</span>
+              <input id="barGradientEnd" type="color" value="#d0d0d0" />
+            </label>
+            <label title="Bar gradient orientation">
+              <span>Bar gradient dir</span>
+              <select id="barGradientDir">
+                <option value="lr" selected>Left → Right</option>
+                <option value="ud">Top → Bottom</option>
+              </select>
+            </label>
+            <label title="Bar outline width">
+              <span>Bar width</span>
+              <input id="barLineWidth" type="number" min="0" step="0.5" value="0" />
+            </label>
+          </div>
+          <div class="style-group">
+            <span class="style-group-title">FFT</span>
+            <label title="FFT line color">
+              <span>FFT color</span>
+              <input id="fftLineColor" type="color" value="#d0d0d0" />
+            </label>
+            <label title="FFT line width">
+              <span>FFT width</span>
+              <input id="fftLineWidth" type="number" min="0.5" step="0.5" value="2" />
+            </label>
+          </div>
+          <div class="style-group">
+            <span class="style-group-title">Grid</span>
+            <label title="Show grid">
+              <input id="gridShowChk" type="checkbox" checked />
+              <span>Grid display</span>
+            </label>
+            <label title="Show Hz labels on grid lines">
+              <input id="labelsChk" type="checkbox" checked />
+              <span>Hz labels</span>
+            </label>
+            <label title="Grid color">
+              <span>Grid color</span>
+              <input id="gridColor" type="color" value="#1f1f1f" />
+            </label>
+            <label title="Grid line width">
+              <span>Grid width</span>
+              <input id="gridLineWidth" type="number" min="0.5" step="0.5" value="1" />
+            </label>
+          </div>
+          <div class="style-group">
+            <span class="style-group-title">Background</span>
+            <label title="Background color">
+              <span>BG color</span>
+              <input id="bgColor" type="color" value="#0b0b0b" />
+            </label>
+            <label title="Background gradient start">
+              <span>BG gradient start</span>
+              <input id="bgGradientStart" type="color" value="#0b0b0b" />
+            </label>
+            <label title="Background gradient end">
+              <span>BG gradient end</span>
+              <input id="bgGradientEnd" type="color" value="#141414" />
+            </label>
+            <label title="Background gradient orientation">
+              <span>BG gradient dir</span>
+              <select id="bgGradientDir">
+                <option value="lr" selected>Left → Right</option>
+                <option value="ud">Top → Bottom</option>
+              </select>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="row-log" class="menu-row hidden">
+      <label title="Show/hide error log panel">
+        <input id="logChk" type="checkbox" />
+        <span>Log</span>
+      </label>
+    </div>
+    <div id="row-help" class="menu-row hidden">
+      <div class="help-panel">
+        <h3>Quick help</h3>
+        <ul>
+          <li><kbd>Space</kbd> Freeze / resume</li>
+          <li><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> Load preset bank</li>
+          <li><kbd>←</kbd> / <kbd>→</kbd> Adjust Max Hz</li>
+          <li><kbd>↑</kbd> / <kbd>↓</kbd> Adjust Min Hz</li>
+          <li><kbd>L</kbd> Cycle view (1/3-oct, 1/x-oct, FFT)</li>
+          <li><kbd>F</kbd> Freeze / resume</li>
+          <li><kbd>R</kbd> Reset peaks</li>
+          <li><kbd>P</kbd> Toggle peak hold</li>
+          <li><kbd>G</kbd> Toggle grid</li>
+          <li><kbd>H</kbd> Toggle Hz labels</li>
+          <li><kbd>M</kbd> Mic input</li>
+          <li><kbd>T</kbd> Screen/tab audio</li>
+          <li><kbd>S</kbd> Stop</li>
+        </ul>
+      </div>
+    </div>
   </div>
 
   <canvas id="c"></canvas>
@@ -142,8 +309,16 @@
   const autoOctControls = document.getElementById('autoOctControls');
   const octaveDivisorEl = document.getElementById('octaveDivisor');
   const octaveAutoChk = document.getElementById('octaveAutoChk');
-  const topBar = document.getElementById('top');
-  const toggleMenusBtn = document.getElementById('toggleMenusBtn');
+  const menuBtn = document.getElementById('menuBtn');
+  const menuPanel = document.getElementById('menuPanel');
+  const menuTabs = menuPanel ? Array.from(menuPanel.querySelectorAll('.menu-tab')) : [];
+  const menuRows = {
+    source: document.getElementById('row-source'),
+    behaviour: document.getElementById('row-behaviour'),
+    style: document.getElementById('row-style'),
+    log: document.getElementById('row-log'),
+    help: document.getElementById('row-help')
+  };
   const freezeBtn = document.getElementById('freezeBtn');
   const tooltip = document.createElement('div');
   tooltip.className = 'tooltip hidden';
@@ -154,21 +329,172 @@
   const logChk = document.getElementById('logChk');
   const logWrap = document.getElementById('logWrap');
   const bankSel = document.getElementById('bankSel');
+  const stylePresetSel = document.getElementById('stylePreset');
+  const barColorPicker = document.getElementById('barColor');
+  const barGradientStartPicker = document.getElementById('barGradientStart');
+  const barGradientEndPicker = document.getElementById('barGradientEnd');
+  const barGradientDirSel = document.getElementById('barGradientDir');
+  const barLineWidthInput = document.getElementById('barLineWidth');
+  const fftLineColorPicker = document.getElementById('fftLineColor');
+  const fftLineWidthInput = document.getElementById('fftLineWidth');
+  const gridShowChk = document.getElementById('gridShowChk');
+  const gridColorPicker = document.getElementById('gridColor');
+  const gridLineWidthInput = document.getElementById('gridLineWidth');
+  const bgColorPicker = document.getElementById('bgColor');
+  const bgGradientStartPicker = document.getElementById('bgGradientStart');
+  const bgGradientEndPicker = document.getElementById('bgGradientEnd');
+  const bgGradientDirSel = document.getElementById('bgGradientDir');
 
   const BANK_STORAGE_PREFIX = 'rta-bank-';
+  const DEFAULT_BANKS = {
+    1: {
+      view: 'autoOctave',
+      scale: 'log',
+      labels: true,
+      minHz: '60',
+      maxHz: '12000',
+      fft: '8192',
+      smoothing: '0.853',
+      dbRange: '-80,-20',
+      octaveDivisor: '8',
+      octaveAuto: false,
+      log: false,
+      peakHold: false
+    },
+    2: {
+      view: 'autoOctave',
+      scale: 'log',
+      labels: true,
+      minHz: '56',
+      maxHz: '12000',
+      fft: '2048',
+      smoothing: '0.853',
+      dbRange: '-90,-20',
+      octaveDivisor: '3',
+      octaveAuto: false,
+      log: false,
+      peakHold: false,
+      backgroundColor: '#000000',
+      backgroundGradientDir: 'ud',
+      backgroundGradientEnd: '#800000',
+      backgroundGradientStart: '#000000',
+      barColor: '#9a88ff',
+      barGradientDir: 'ud',
+      barGradientEnd: '#3900f5',
+      barGradientStart: '#00c24a',
+      barLineWidth: 10,
+      fftLineColor: '#d0d0d0',
+      fftLineWidth: 2,
+      gridColor: '#f31212',
+      gridLineWidth: 1,
+      gridShow: true
+    },
+    3: {
+      view: 'fft',
+      scale: 'log',
+      labels: true,
+      minHz: '80',
+      maxHz: '10000',
+      fft: '2048',
+      smoothing: '0.921',
+      dbRange: '-90,-20',
+      octaveDivisor: '3',
+      octaveAuto: false,
+      log: false,
+      peakHold: true,
+      backgroundColor: '#000000',
+      backgroundGradientDir: 'ud',
+      backgroundGradientEnd: '#000000',
+      backgroundGradientStart: '#000000',
+      barColor: '#9a88ff',
+      barGradientDir: 'ud',
+      barGradientEnd: '#3900f5',
+      barGradientStart: '#00c24a',
+      barLineWidth: 10,
+      fftLineColor: '#ff00bb',
+      fftLineWidth: 4,
+      gridColor: '#f31212',
+      gridLineWidth: 0.5,
+      gridShow: true
+    }
+  };
+  const STYLE_DEFAULTS = {
+    barColor: '#d0d0d0',
+    barGradientStart: '#d0d0d0',
+    barGradientEnd: '#d0d0d0',
+    barGradientDir: 'lr',
+    barLineWidth: 0,
+    fftLineColor: '#d0d0d0',
+    fftLineWidth: 2,
+    gridColor: '#1f1f1f',
+    gridLineWidth: 1,
+    gridShow: true,
+    backgroundColor: '#0b0b0b',
+    backgroundGradientStart: '#0b0b0b',
+    backgroundGradientEnd: '#141414',
+    backgroundGradientDir: 'lr'
+  };
   const DEFAULT_SETTINGS = {
     view: 'third',
     scale: 'log',
     labels: true,
-    minHz: 10,
+    minHz: 50,
     maxHz: 15000,
     fft: '2048',
-    smoothing: '0.6',
-    dbRange: '-80,-20',
+    smoothing: '0.65',
+    dbRange: '-90,-20',
     octaveDivisor: '3',
     octaveAuto: false,
     log: false,
-    peakHold: false
+    peakHold: false,
+    gridShow: true,
+    ...STYLE_DEFAULTS
+  };
+  const STYLE_PRESETS = {
+    'bars-gradient-lr-light': {
+      barGradientDir: 'lr',
+      barGradientStart: '#ffe29a',
+      barGradientEnd: '#ff6a6a',
+      barColor: '#ffb347'
+    },
+    'bars-gradient-lr-dark': {
+      barGradientDir: 'lr',
+      barGradientStart: '#7163dd',
+      barGradientEnd: '#221747',
+      barColor: '#9a88ff'
+    },
+    'bars-gradient-ud-light': {
+      barGradientDir: 'ud',
+      barGradientStart: '#fdf0bb',
+      barGradientEnd: '#f5736c',
+      barColor: '#ff9b5a'
+    },
+    'bars-gradient-ud-dark': {
+      barGradientDir: 'ud',
+      barGradientStart: '#2e3192',
+      barGradientEnd: '#1b1f4b',
+      barColor: '#4b52c1'
+    },
+    'fft-light': {
+      fftLineColor: '#d7f8ff',
+      fftLineWidth: 3
+    },
+    'fft-dark': {
+      fftLineColor: '#ffa5ff',
+      fftLineWidth: 3
+    },
+    'bg-light': {
+      backgroundColor: '#f6f7fb',
+      backgroundGradientStart: '#ffffff',
+      backgroundGradientEnd: '#d4ddff',
+      backgroundGradientDir: 'lr'
+    },
+    'bg-dark': {
+      backgroundColor: '#05050a',
+      backgroundGradientStart: '#010101',
+      backgroundGradientEnd: '#12121f',
+      backgroundGradientDir: 'lr'
+    }
   };
 
   let ac = null, analyser = null, src = null;
@@ -179,7 +505,6 @@
 
   let bandsCacheKey = '';
   let bands = []; // [{fc, f1, f2, label}...]
-  let menusHidden = false;
   let peakHoldEnabled = false;
   let fftPeaks = null;
   let bandPeaks = null;
@@ -218,8 +543,9 @@
 
   function updateLogVisibility() {
     if (!logWrap) return;
-    const shouldShow = logChk.checked && !menusHidden;
+    const shouldShow = !!(logChk && logChk.checked);
     logWrap.classList.toggle('hidden', !shouldShow);
+    document.body.classList.toggle('log-open', shouldShow);
   }
 
   logChk.addEventListener('change', updateLogVisibility);
@@ -245,6 +571,33 @@
     canvas.height = Math.floor(canvas.clientHeight * dpr);
   }
   window.addEventListener('resize', resize);
+  function logViewportStats(label) {
+    const vv = window.visualViewport;
+    const orientation = screen.orientation ? `${screen.orientation.type} ${screen.orientation.angle}` : 'unknown';
+    const client = `${Math.round(document.documentElement.clientWidth)}x${Math.round(document.documentElement.clientHeight)}`;
+    const inner = `${Math.round(window.innerWidth)}x${Math.round(window.innerHeight)}`;
+    const canvasRect = canvas.getBoundingClientRect();
+    const canvasSize = `${Math.round(canvasRect.width)}x${Math.round(canvasRect.height)}`;
+    const vvSize = vv ? `${Math.round(vv.width)}x${Math.round(vv.height)} scale=${vv.scale.toFixed(2)}` : 'n/a';
+    log(`${label} | orientation=${orientation} | client=${client} | inner=${inner} | canvas=${canvasSize} | vv=${vvSize}`, 'warn');
+  }
+
+  window.addEventListener('orientationchange', () => {
+    logViewportStats('orientationchange');
+    window.setTimeout(() => {
+      resize();
+      logViewportStats('orientationchange+50ms');
+    }, 50);
+  });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+      logViewportStats('visualViewport.resize');
+      window.setTimeout(() => {
+        resize();
+        logViewportStats('visualViewport.resize+0ms');
+      }, 0);
+    });
+  }
   resize();
 
   function hideTooltip() {
@@ -296,7 +649,32 @@
     if (!peakHoldEnabled) resetPeakHoldData();
   }
 
+  function getStyleConfig() {
+    const parseNumber = (el, fallback) => {
+      if (!el) return fallback;
+      const parsed = Number(el.value);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
+    return {
+      barColor: barColorPicker ? barColorPicker.value : DEFAULT_SETTINGS.barColor,
+      barGradientStart: barGradientStartPicker ? barGradientStartPicker.value : DEFAULT_SETTINGS.barGradientStart,
+      barGradientEnd: barGradientEndPicker ? barGradientEndPicker.value : DEFAULT_SETTINGS.barGradientEnd,
+      barGradientDir: barGradientDirSel ? barGradientDirSel.value : DEFAULT_SETTINGS.barGradientDir,
+      barLineWidth: parseNumber(barLineWidthInput, DEFAULT_SETTINGS.barLineWidth),
+      fftLineColor: fftLineColorPicker ? fftLineColorPicker.value : DEFAULT_SETTINGS.fftLineColor,
+      fftLineWidth: parseNumber(fftLineWidthInput, DEFAULT_SETTINGS.fftLineWidth),
+      gridShow: gridShowChk ? gridShowChk.checked : DEFAULT_SETTINGS.gridShow,
+      gridColor: gridColorPicker ? gridColorPicker.value : DEFAULT_SETTINGS.gridColor,
+      gridLineWidth: parseNumber(gridLineWidthInput, DEFAULT_SETTINGS.gridLineWidth),
+      backgroundColor: bgColorPicker ? bgColorPicker.value : DEFAULT_SETTINGS.backgroundColor,
+      backgroundGradientStart: bgGradientStartPicker ? bgGradientStartPicker.value : DEFAULT_SETTINGS.backgroundGradientStart,
+      backgroundGradientEnd: bgGradientEndPicker ? bgGradientEndPicker.value : DEFAULT_SETTINGS.backgroundGradientEnd,
+      backgroundGradientDir: bgGradientDirSel ? bgGradientDirSel.value : DEFAULT_SETTINGS.backgroundGradientDir
+    };
+  }
+
   function getCurrentSettings() {
+    const style = getStyleConfig();
     return {
       view: viewSel.value,
       scale: scaleSel.value,
@@ -309,8 +687,30 @@
       octaveDivisor: octaveDivisorEl.value,
       octaveAuto: octaveAutoChk.checked,
       log: logChk.checked,
-      peakHold: peakHoldChk ? peakHoldChk.checked : false
+      peakHold: peakHoldChk ? peakHoldChk.checked : false,
+      ...style
     };
+  }
+
+  function applyStyleValues(values = {}) {
+    const current = getStyleConfig();
+    const cfg = { ...current, ...values };
+    if (barColorPicker) barColorPicker.value = cfg.barColor;
+    if (barGradientStartPicker) barGradientStartPicker.value = cfg.barGradientStart;
+    if (barGradientEndPicker) barGradientEndPicker.value = cfg.barGradientEnd;
+    if (barGradientDirSel) barGradientDirSel.value = cfg.barGradientDir;
+    if (barLineWidthInput) barLineWidthInput.value = String(cfg.barLineWidth);
+    if (fftLineColorPicker) fftLineColorPicker.value = cfg.fftLineColor;
+    if (fftLineWidthInput) fftLineWidthInput.value = String(cfg.fftLineWidth);
+    if (gridShowChk) gridShowChk.checked = !!cfg.gridShow;
+    if (gridColorPicker) gridColorPicker.value = cfg.gridColor;
+    if (gridLineWidthInput) gridLineWidthInput.value = String(cfg.gridLineWidth);
+    if (bgColorPicker) bgColorPicker.value = cfg.backgroundColor;
+    if (bgGradientStartPicker) bgGradientStartPicker.value = cfg.backgroundGradientStart;
+    if (bgGradientEndPicker) bgGradientEndPicker.value = cfg.backgroundGradientEnd;
+    if (bgGradientDirSel) bgGradientDirSel.value = cfg.backgroundGradientDir;
+    if (stylePresetSel) stylePresetSel.value = '';
+    refreshStylePreview();
   }
 
   function applySettings(settings) {
@@ -326,6 +726,7 @@
     if (octaveDivisorEl) octaveDivisorEl.value = String(cfg.octaveDivisor);
     if (octaveAutoChk) octaveAutoChk.checked = !!cfg.octaveAuto;
     logChk.checked = !!cfg.log;
+    applyStyleValues(cfg);
     updateLogVisibility();
     if (peakHoldChk) {
       peakHoldChk.checked = !!cfg.peakHold;
@@ -333,6 +734,22 @@
     }
     if (analyser) setupAnalyser();
     viewSel.dispatchEvent(new Event('change'));
+  }
+
+  function ensureDefaultBanks() {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      Object.keys(DEFAULT_BANKS).forEach((key) => {
+        const bankNum = Number(key);
+        if (!Number.isFinite(bankNum)) return;
+        const storageKey = `${BANK_STORAGE_PREFIX}${bankNum}`;
+        if (!localStorage.getItem(storageKey)) {
+          localStorage.setItem(storageKey, JSON.stringify(DEFAULT_BANKS[bankNum]));
+        }
+      });
+    } catch (e) {
+      logErr('Default bank init failed', e);
+    }
   }
 
   function saveBank(bankNum) {
@@ -382,15 +799,6 @@
     else if (op === 'load') loadBank(num);
   }
 
-  if (toggleMenusBtn && topBar) {
-    toggleMenusBtn.addEventListener('click', () => {
-      menusHidden = !menusHidden;
-      topBar.classList.toggle('hidden', menusHidden);
-      toggleMenusBtn.textContent = menusHidden ? 'Show menus' : 'Hide menus';
-      updateLogVisibility();
-    });
-  }
-
   if (peakHoldChk) {
     peakHoldChk.addEventListener('change', () => setPeakHold(peakHoldChk.checked));
   }
@@ -398,8 +806,158 @@
     peakResetBtn.addEventListener('click', () => resetPeakHoldData());
   }
 
+  const MENU_ANIM_MS = 160;
+  let lastVisibleRows = ['source'];
+
+  function isMobileLayout() {
+    return window.matchMedia('(max-width: 768px)').matches;
+  }
+
+  function positionMenuPanel() {
+    if (!menuPanel || !menuBtn) return;
+    const btnRect = menuBtn.getBoundingClientRect();
+    const maxLeft = Math.max(8, window.innerWidth - menuPanel.offsetWidth - 8);
+    const left = Math.min(btnRect.right + 8, maxLeft);
+    menuPanel.style.top = `${Math.round(btnRect.top)}px`;
+    menuPanel.style.left = `${Math.round(left)}px`;
+  }
+
+  function getVisibleRowKeys() {
+    return Object.keys(menuRows).filter(key => {
+      const row = menuRows[key];
+      return row && !row.classList.contains('hidden');
+    });
+  }
+
+  function positionOpenRows() {
+    if (!menuPanel || !menuBtn) return;
+    const visibleKeys = getVisibleRowKeys();
+    if (!visibleKeys.length) return;
+    const btnRect = menuBtn.getBoundingClientRect();
+    const panelRect = menuPanel.getBoundingClientRect();
+    let maxWidth = 0;
+    visibleKeys.forEach(key => {
+      const row = menuRows[key];
+      if (!row) return;
+      row.style.maxWidth = `${Math.max(220, window.innerWidth - 16)}px`;
+      maxWidth = Math.max(maxWidth, row.offsetWidth);
+    });
+    const rightSpace = window.innerWidth - panelRect.right - 8;
+    const stackRight = rightSpace >= maxWidth;
+    let currentTop = stackRight ? panelRect.top : btnRect.bottom + 8;
+    const left = stackRight ? Math.round(panelRect.right + 8) : 8;
+    visibleKeys.forEach(key => {
+      const row = menuRows[key];
+      if (!row) return;
+      row.style.left = `${left}px`;
+      row.style.top = `${Math.round(currentTop)}px`;
+      const maxHeight = Math.max(120, window.innerHeight - currentTop - 8);
+      row.style.maxHeight = `${Math.round(maxHeight)}px`;
+      currentTop += row.offsetHeight + 8;
+    });
+  }
+
+  function setRowVisible(key, visible) {
+    const row = menuRows[key];
+    if (!row) return;
+    const tab = menuTabs.find(btn => btn.dataset.row === key);
+    if (visible) {
+      row.classList.remove('hidden');
+      requestAnimationFrame(() => {
+        positionOpenRows();
+        row.classList.add('open');
+      });
+    } else {
+      row.classList.remove('open');
+      window.setTimeout(() => {
+        row.classList.add('hidden');
+        positionOpenRows();
+      }, MENU_ANIM_MS);
+    }
+    if (tab) {
+      tab.classList.toggle('active', visible);
+      tab.setAttribute('aria-pressed', String(visible));
+    }
+  }
+
+  function hideAllRows() {
+    Object.keys(menuRows).forEach(key => setRowVisible(key, false));
+  }
+
+  function setMenuCollapsedState(collapsed) {
+    document.body.classList.toggle('menu-collapsed', !!collapsed);
+  }
+
+  function toggleMenuPanel(forceState) {
+    if (!menuPanel) return;
+    const shouldShow = typeof forceState === 'boolean'
+      ? forceState
+      : menuPanel.classList.contains('hidden');
+    if (shouldShow) {
+      menuPanel.classList.remove('hidden');
+      positionMenuPanel();
+      requestAnimationFrame(() => menuPanel.classList.add('open'));
+      setMenuCollapsedState(false);
+      const restoreKeys = lastVisibleRows.length ? lastVisibleRows : [];
+      const keysToShow = isMobileLayout() && restoreKeys.length ? [restoreKeys[0]] : restoreKeys;
+      keysToShow.forEach(key => setRowVisible(key, true));
+    } else {
+      lastVisibleRows = getVisibleRowKeys();
+      menuPanel.classList.remove('open');
+      window.setTimeout(() => menuPanel.classList.add('hidden'), MENU_ANIM_MS);
+      hideAllRows();
+      setMenuCollapsedState(true);
+    }
+    if (menuBtn) menuBtn.setAttribute('aria-expanded', String(shouldShow));
+  }
+
+  if (menuBtn) {
+    menuBtn.addEventListener('click', () => toggleMenuPanel());
+  }
+
+  if (menuTabs.length) {
+    menuTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const key = tab.dataset.row;
+        const row = key ? menuRows[key] : null;
+        if (!row) return;
+        const willShow = row.classList.contains('hidden');
+        if (isMobileLayout() && willShow) {
+          Object.keys(menuRows).forEach(otherKey => {
+            if (otherKey !== key) setRowVisible(otherKey, false);
+          });
+        }
+        setRowVisible(key, willShow);
+      });
+    });
+  }
+
+  window.addEventListener('resize', () => {
+    if (!menuPanel || menuPanel.classList.contains('hidden')) return;
+    positionMenuPanel();
+    const visibleKeys = getVisibleRowKeys();
+    if (isMobileLayout() && visibleKeys.length > 1) {
+      visibleKeys.slice(1).forEach(key => setRowVisible(key, false));
+    }
+    positionOpenRows();
+  });
+
   // ---------- Helpers ----------
   function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+
+  function buildDirectionalGradient(start, end, dir, width, height, fallback) {
+    const from = start || fallback;
+    const to = end || from;
+    if (!from || !to) return fallback || from;
+    if (from === to) return from;
+    if (!width || !height) return from;
+    const gradient = dir === 'ud'
+      ? ctx2d.createLinearGradient(0, 0, 0, height)
+      : ctx2d.createLinearGradient(0, 0, width, 0);
+    gradient.addColorStop(0, from);
+    gradient.addColorStop(1, to);
+    return gradient;
+  }
 
   function getHzLimits(sampleRate) {
   const nyq = sampleRate / 2;
@@ -665,18 +1223,35 @@
   // ---------- Drawing ----------
   function drawIdle() {
     resize();
-    ctx2d.fillStyle = '#0b0b0b';
+    const style = getStyleConfig();
+    const bg = buildDirectionalGradient(
+      style.backgroundGradientStart,
+      style.backgroundGradientEnd,
+      style.backgroundGradientDir,
+      canvas.width,
+      canvas.height,
+      style.backgroundColor
+    );
+    ctx2d.fillStyle = bg;
     ctx2d.fillRect(0,0,canvas.width,canvas.height);
     ctx2d.fillStyle = '#666';
+    ctx2d.textAlign = 'center';
+    ctx2d.textBaseline = 'middle';
     ctx2d.font = `${Math.floor(canvas.height/18)}px system-ui`;
-    ctx2d.fillText('RTA idle', 20, 50);
+    ctx2d.fillText('RTA idle', canvas.width / 2, canvas.height / 2 - 12);
     ctx2d.font = '14px system-ui';
-    ctx2d.fillText('Choose Mic or Screen/Tab audio', 20, 75);
+    ctx2d.fillText('Choose Mic or Screen/Tab audio', canvas.width / 2, canvas.height / 2 + 16);
   }
 
-  function drawGrid(w, h) {
-    ctx2d.strokeStyle = '#1f1f1f';
-    ctx2d.lineWidth = 1;
+  function refreshStylePreview() {
+    if (!raf) drawIdle();
+  }
+
+  function drawGrid(w, h, style) {
+    if (gridShowChk && !gridShowChk.checked) return;
+    const gridWidth = Math.max(0.5, style.gridLineWidth || 1);
+    ctx2d.strokeStyle = style.gridColor;
+    ctx2d.lineWidth = gridWidth;
     ctx2d.beginPath();
 
     const freqs = gridFrequencies(ac.sampleRate);
@@ -705,9 +1280,10 @@
     }
   }
 
-  function drawFftLine(w, h) {
-    ctx2d.strokeStyle = '#d0d0d0';
-    ctx2d.lineWidth = 2;
+  function drawFftLine(w, h, style) {
+    const lineWidth = Math.max(0.5, style.fftLineWidth || DEFAULT_SETTINGS.fftLineWidth);
+    ctx2d.strokeStyle = style.fftLineColor;
+    ctx2d.lineWidth = lineWidth;
     ctx2d.beginPath();
 
     const binCount = data.length;
@@ -767,13 +1343,23 @@
     }
   }
 
-  function drawOctaveBars(w, h, bandSet, labelStep = 3) {
+  function drawOctaveBars(w, h, bandSet, labelStep = 3, style) {
     if (!bandSet.length) return;
 
     if (peakHoldEnabled) ensureBandPeaks(bandSet.length);
     else bandPeaks = null;
 
-    ctx2d.fillStyle = '#d0d0d0';
+    const barFill = buildDirectionalGradient(
+      style.barGradientStart,
+      style.barGradientEnd,
+      style.barGradientDir,
+      w,
+      h,
+      style.barColor
+    );
+    ctx2d.fillStyle = barFill;
+    const outlineWidth = Math.max(0, style.barLineWidth || 0);
+
     for (let i=0; i<bandSet.length; i++) {
       const band = bandSet[i];
       const x1 = hzToX(band.f1, ac.sampleRate, w);
@@ -792,13 +1378,19 @@
       const ww = Math.max(1, bw - pad * 2);
       ctx2d.fillRect(xx, y, ww, h - y);
 
+      if (outlineWidth > 0) {
+        ctx2d.strokeStyle = style.barColor;
+        ctx2d.lineWidth = outlineWidth;
+        ctx2d.strokeRect(xx, y, ww, h - y);
+      }
+
       if (peakHoldEnabled && bandPeaks) {
         const peak = bandPeaks[i];
         if (peak > 0) {
           const yPeak = Math.max(0, (1 - peak) * h - 2);
           ctx2d.fillStyle = '#f7b';
           ctx2d.fillRect(xx, yPeak, ww, 2);
-          ctx2d.fillStyle = '#d0d0d0';
+          ctx2d.fillStyle = barFill;
         }
       }
     }
@@ -818,18 +1410,18 @@
     }
   }
 
-  function drawThirdOctaveBars(w, h) {
+  function drawThirdOctaveBars(w, h, style) {
     const b = buildThirdOctaveBands(ac.sampleRate);
     const step = (scaleSel.value === 'lin') ? 3 : 4;
-    drawOctaveBars(w, h, b, step);
+    drawOctaveBars(w, h, b, step, style);
   }
 
-  function drawAutoOctaveBars(w, h) {
+  function drawAutoOctaveBars(w, h, style) {
     const { minHz, maxHz } = getHzLimits(ac.sampleRate);
     const divisor = resolveOctaveDivisor(minHz, maxHz);
     const b = buildOctaveBands(ac.sampleRate, divisor);
     const step = Math.max(1, Math.floor(divisor / 2));
-    drawOctaveBars(w, h, b, step);
+    drawOctaveBars(w, h, b, step, style);
   }
 
   function draw() {
@@ -841,14 +1433,23 @@
       if (!isFrozen) analyser.getByteFrequencyData(data);
 
       const w = canvas.width, h = canvas.height;
-      ctx2d.fillStyle = '#0b0b0b';
+      const style = getStyleConfig();
+      const bgFill = buildDirectionalGradient(
+        style.backgroundGradientStart,
+        style.backgroundGradientEnd,
+        style.backgroundGradientDir,
+        w,
+        h,
+        style.backgroundColor
+      );
+      ctx2d.fillStyle = bgFill;
       ctx2d.fillRect(0,0,w,h);
 
-      drawGrid(w, h);
+      drawGrid(w, h, style);
 
-      if (viewSel.value === 'third') drawThirdOctaveBars(w, h);
-      else if (viewSel.value === 'autoOctave') drawAutoOctaveBars(w, h);
-      else drawFftLine(w, h);
+      if (viewSel.value === 'third') drawThirdOctaveBars(w, h, style);
+      else if (viewSel.value === 'autoOctave') drawAutoOctaveBars(w, h, style);
+      else drawFftLine(w, h, style);
 
       // footer
       ctx2d.fillStyle = '#777';
@@ -919,9 +1520,65 @@
       bankSel.value = '';
     });
   }
+  if (stylePresetSel) {
+    stylePresetSel.addEventListener('change', () => {
+      const action = stylePresetSel.value;
+      if (!action) return;
+      const label = stylePresetSel.options[stylePresetSel.selectedIndex]?.text;
+      if (action === 'style-reset') {
+        applyStyleValues(DEFAULT_SETTINGS);
+        log('Style reset to defaults', 'ok');
+      } else {
+        const preset = STYLE_PRESETS[action];
+        if (preset) {
+          applyStyleValues(preset);
+          if (label) log(`Style preset: ${label}`, 'ok');
+        }
+      }
+      stylePresetSel.value = '';
+    });
+  }
+
+  const styleReactiveElements = [
+    barColorPicker,
+    barGradientStartPicker,
+    barGradientEndPicker,
+    barGradientDirSel,
+    barLineWidthInput,
+    fftLineColorPicker,
+    fftLineWidthInput,
+    gridShowChk,
+    gridColorPicker,
+    gridLineWidthInput,
+    bgColorPicker,
+    bgGradientStartPicker,
+    bgGradientEndPicker,
+    bgGradientDirSel
+  ].filter(Boolean);
+  styleReactiveElements.forEach(el => {
+    el.addEventListener('input', refreshStylePreview);
+    if (el instanceof HTMLSelectElement) {
+      el.addEventListener('change', refreshStylePreview);
+    }
+  });
+
+  function dynamicMinHzStep(value) {
+    const v = Number(value);
+    if (!Number.isFinite(v)) return 0.1;
+    if (v < 10) return 0.1;
+    if (v < 100) return 1;
+    return 10;
+  }
+
+  function updateMinHzStep() {
+    if (!minHzEl) return;
+    const step = dynamicMinHzStep(minHzEl.value);
+    minHzEl.step = String(step);
+  }
 
   function invalidateBands() { bandsCacheKey = ''; }
   minHzEl.addEventListener('input', invalidateBands);
+  minHzEl.addEventListener('input', updateMinHzStep);
   maxHzEl.addEventListener('input', invalidateBands);
   viewSel.addEventListener('change', () => {
     invalidateBands();
@@ -933,15 +1590,100 @@
   if (octaveAutoChk) octaveAutoChk.addEventListener('change', invalidateBands);
 
   updateAutoOctControlsVisibility();
+  ensureDefaultBanks();
+  updateMinHzStep();
   updateLogVisibility();
+  toggleMenuPanel(true);
+  setRowVisible('source', true);
+  setMenuCollapsedState(false);
   drawIdle();
   log('Ready', 'ok');
     setFreezeState(false);
 
   document.addEventListener('keydown', (ev) => {
-    if (ev.code === 'Space' || ev.key === ' ') {
+    const target = ev.target;
+    if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement || target?.isContentEditable) {
+      return;
+    }
+    const key = ev.key;
+    if (ev.code === 'Space' || key === ' ') {
       ev.preventDefault();
       setFreezeState(!isFrozen);
+      return;
+    }
+    if (key === '1' || key === '2' || key === '3') {
+      ev.preventDefault();
+      handleBankAction(`bank-${key}-load`);
+      return;
+    }
+    if (key === 'ArrowLeft' || key === 'ArrowRight') {
+      ev.preventDefault();
+      const step = parseFloat(maxHzEl.step) || 100;
+      const decimals = Math.max(0, (step.toString().split('.')[1] || '').length);
+      const current = parseFloat(maxHzEl.value) || 0;
+      const dir = key === 'ArrowRight' ? 1 : -1;
+      maxHzEl.value = String(Number((current + dir * step).toFixed(decimals)));
+      maxHzEl.dispatchEvent(new Event('input', { bubbles: true }));
+      return;
+    }
+    if (key === 'ArrowUp' || key === 'ArrowDown') {
+      ev.preventDefault();
+      const step = dynamicMinHzStep(minHzEl.value);
+      const decimals = Math.max(0, (step.toString().split('.')[1] || '').length);
+      const current = parseFloat(minHzEl.value) || 0;
+      const dir = key === 'ArrowUp' ? 1 : -1;
+      minHzEl.value = String(Number((current + dir * step).toFixed(decimals)));
+      minHzEl.dispatchEvent(new Event('input', { bubbles: true }));
+      return;
+    }
+    if (key.toLowerCase() === 'l') {
+      ev.preventDefault();
+      const nextIndex = (viewSel.selectedIndex + 1) % viewSel.options.length;
+      viewSel.selectedIndex = nextIndex;
+      viewSel.dispatchEvent(new Event('change', { bubbles: true }));
+      return;
+    }
+    if (key.toLowerCase() === 'f') {
+      ev.preventDefault();
+      setFreezeState(!isFrozen);
+      return;
+    }
+    if (key.toLowerCase() === 'r') {
+      ev.preventDefault();
+      resetPeakHoldData();
+      return;
+    }
+    if (key.toLowerCase() === 'p' && peakHoldChk) {
+      ev.preventDefault();
+      peakHoldChk.checked = !peakHoldChk.checked;
+      setPeakHold(peakHoldChk.checked);
+      return;
+    }
+    if (key.toLowerCase() === 'g' && gridShowChk) {
+      ev.preventDefault();
+      gridShowChk.checked = !gridShowChk.checked;
+      refreshStylePreview();
+      return;
+    }
+    if (key.toLowerCase() === 'h' && labelsChk) {
+      ev.preventDefault();
+      labelsChk.checked = !labelsChk.checked;
+      refreshStylePreview();
+      return;
+    }
+    if (key.toLowerCase() === 'm') {
+      ev.preventDefault();
+      micBtn.click();
+      return;
+    }
+    if (key.toLowerCase() === 't') {
+      ev.preventDefault();
+      screenBtn.click();
+      return;
+    }
+    if (key.toLowerCase() === 's') {
+      ev.preventDefault();
+      stopBtn.click();
     }
   });
 
@@ -949,7 +1691,9 @@
     const target = ev.target;
     if (!(target instanceof HTMLInputElement)) return;
     if (target.type !== 'number') return;
-    const step = parseFloat(target.step) || 1;
+    const step = target.id === 'minHz'
+      ? dynamicMinHzStep(target.value)
+      : (parseFloat(target.step) || 1);
     const decimals = Math.max(0, (step.toString().split('.')[1] || '').length);
     ev.preventDefault();
     const direction = ev.deltaY > 0 ? -1 : 1;
