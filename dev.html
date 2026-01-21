@@ -19,7 +19,7 @@
     #menuPanel.open { transform:translateX(0); opacity:1; pointer-events:auto; }
     .menu-tab.active { border-color:#6aa; box-shadow:0 0 0 1px rgba(102,170,170,0.4); }
     .menu-rows { display:flex; flex-direction:column; gap:10px; }
-    .menu-row { padding:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; position:fixed; z-index:10; background:#0d0d0d; border:1px solid #222; border-radius:12px; box-shadow:0 8px 18px rgba(0,0,0,0.45); transform:translateX(-8px); opacity:0; pointer-events:none; transition:transform 160ms ease, opacity 160ms ease; max-height:calc(100vh - 24px); overflow:auto; }
+    .menu-row { padding:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; position:fixed; z-index:10; background:#0d0d0d; border:1px solid #222; border-radius:12px; box-shadow:0 8px 18px rgba(0,0,0,0.45); transform:translateX(-8px); opacity:0; pointer-events:none; transition:transform 160ms ease, opacity 160ms ease; max-height:calc(100vh - 24px); overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
     .menu-row.hidden { display:none; }
     .menu-row.open { transform:translateX(0); opacity:1; pointer-events:auto; }
     .tooltip { position:absolute; padding:4px 8px; background:#101010; color:#f0f0f0; border:1px solid #333; border-radius:4px; font-size:12px; pointer-events:none; white-space:nowrap; transform:translate(-50%, -100%); box-shadow:0 0 10px rgba(0,0,0,0.6); }
@@ -106,6 +106,15 @@
         <option selected>2048</option>
         <option>4096</option>
         <option>8192</option>
+      </select>
+
+      <span class="label">Tooltip</span>
+      <select id="tooltipMode" title="Tooltip content">
+        <option value="note-hz" selected>Note + Hz</option>
+        <option value="note">Note</option>
+        <option value="hz">Hz</option>
+        <option value="hz-note">Hz + Note</option>
+        <option value="off">Off</option>
       </select>
 
       <div id="autoOctControls" class="auto-oct-controls hidden" title="1/x octaves plus auto density">
@@ -198,6 +207,10 @@
             <label title="Bar outline width">
               <span>Bar width</span>
               <input id="barLineWidth" type="number" min="0" step="0.5" value="0" />
+            </label>
+            <label title="Peak hold marker color">
+              <span>Peak color</span>
+              <input id="peakHoldColor" type="color" value="#ff0000" />
             </label>
           </div>
           <div class="style-group">
@@ -305,6 +318,7 @@
   const fftSel = document.getElementById('fftSel');
   const smooth = document.getElementById('smooth');
   const dbSel = document.getElementById('dbSel');
+  const tooltipModeSel = document.getElementById('tooltipMode');
 
   const autoOctControls = document.getElementById('autoOctControls');
   const octaveDivisorEl = document.getElementById('octaveDivisor');
@@ -335,6 +349,7 @@
   const barGradientEndPicker = document.getElementById('barGradientEnd');
   const barGradientDirSel = document.getElementById('barGradientDir');
   const barLineWidthInput = document.getElementById('barLineWidth');
+  const peakHoldColorPicker = document.getElementById('peakHoldColor');
   const fftLineColorPicker = document.getElementById('fftLineColor');
   const fftLineWidthInput = document.getElementById('fftLineWidth');
   const gridShowChk = document.getElementById('gridShowChk');
@@ -346,12 +361,88 @@
   const bgGradientDirSel = document.getElementById('bgGradientDir');
 
   const BANK_STORAGE_PREFIX = 'rta-bank-';
+  const DEFAULT_BANKS = {
+    1: {
+      view: 'autoOctave',
+      scale: 'log',
+      labels: true,
+      minHz: '60',
+      maxHz: '12000',
+      fft: '8192',
+      smoothing: '0.853',
+      dbRange: '-80,-20',
+      octaveDivisor: '8',
+      octaveAuto: false,
+      tooltipMode: 'note-hz',
+      log: false,
+      peakHold: false
+    },
+    2: {
+      view: 'autoOctave',
+      scale: 'log',
+      labels: true,
+      minHz: '56',
+      maxHz: '12000',
+      fft: '2048',
+      smoothing: '0.853',
+      dbRange: '-90,-20',
+      octaveDivisor: '3',
+      octaveAuto: false,
+      tooltipMode: 'note-hz',
+      log: false,
+      peakHold: false,
+      backgroundColor: '#000000',
+      backgroundGradientDir: 'ud',
+      backgroundGradientEnd: '#800000',
+      backgroundGradientStart: '#000000',
+      barColor: '#9a88ff',
+      barGradientDir: 'ud',
+      barGradientEnd: '#3900f5',
+      barGradientStart: '#00c24a',
+      barLineWidth: 10,
+      fftLineColor: '#d0d0d0',
+      fftLineWidth: 2,
+      gridColor: '#f31212',
+      gridLineWidth: 1,
+      gridShow: true
+    },
+    3: {
+      view: 'fft',
+      scale: 'log',
+      labels: true,
+      minHz: '80',
+      maxHz: '10000',
+      fft: '2048',
+      smoothing: '0.921',
+      dbRange: '-90,-20',
+      octaveDivisor: '3',
+      octaveAuto: false,
+      tooltipMode: 'note-hz',
+      log: false,
+      peakHold: true,
+      backgroundColor: '#000000',
+      backgroundGradientDir: 'ud',
+      backgroundGradientEnd: '#000000',
+      backgroundGradientStart: '#000000',
+      barColor: '#9a88ff',
+      barGradientDir: 'ud',
+      barGradientEnd: '#3900f5',
+      barGradientStart: '#00c24a',
+      barLineWidth: 10,
+      fftLineColor: '#ff00bb',
+      fftLineWidth: 4,
+      gridColor: '#f31212',
+      gridLineWidth: 0.5,
+      gridShow: true
+    }
+  };
   const STYLE_DEFAULTS = {
     barColor: '#d0d0d0',
     barGradientStart: '#d0d0d0',
     barGradientEnd: '#d0d0d0',
     barGradientDir: 'lr',
     barLineWidth: 0,
+    peakHoldColor: '#f7b',
     fftLineColor: '#d0d0d0',
     fftLineWidth: 2,
     gridColor: '#1f1f1f',
@@ -373,6 +464,7 @@
     dbRange: '-90,-20',
     octaveDivisor: '3',
     octaveAuto: false,
+    tooltipMode: 'note-hz',
     log: false,
     peakHold: false,
     gridShow: true,
@@ -533,14 +625,17 @@
   }
 
   function handleCanvasHover(ev) {
-    if (!ac || viewSel.value === 'fft') { hideTooltip(); return; }
+    if (!ac) { hideTooltip(); return; }
+    if (tooltipModeSel && tooltipModeSel.value === 'off') { hideTooltip(); return; }
     const rect = canvas.getBoundingClientRect();
     if (!rect.width) { hideTooltip(); return; }
     const x = clamp(ev.clientX - rect.left, 0, rect.width);
     const logicalX = (x / rect.width) * canvas.width;
     const freq = xToHz(logicalX, ac.sampleRate, canvas.width);
     if (!Number.isFinite(freq) || freq <= 0) { hideTooltip(); return; }
-    tooltip.textContent = `${freqToNoteLabel(freq)} ${fmtHz(freq)}Hz`;
+    const label = formatTooltipLabel(freq);
+    if (!label) { hideTooltip(); return; }
+    tooltip.textContent = label;
     tooltip.style.left = `${ev.clientX}px`;
     tooltip.style.top = `${ev.clientY - 10}px`;
     tooltip.classList.remove('hidden');
@@ -589,6 +684,7 @@
       barGradientEnd: barGradientEndPicker ? barGradientEndPicker.value : DEFAULT_SETTINGS.barGradientEnd,
       barGradientDir: barGradientDirSel ? barGradientDirSel.value : DEFAULT_SETTINGS.barGradientDir,
       barLineWidth: parseNumber(barLineWidthInput, DEFAULT_SETTINGS.barLineWidth),
+      peakHoldColor: peakHoldColorPicker ? peakHoldColorPicker.value : DEFAULT_SETTINGS.peakHoldColor,
       fftLineColor: fftLineColorPicker ? fftLineColorPicker.value : DEFAULT_SETTINGS.fftLineColor,
       fftLineWidth: parseNumber(fftLineWidthInput, DEFAULT_SETTINGS.fftLineWidth),
       gridShow: gridShowChk ? gridShowChk.checked : DEFAULT_SETTINGS.gridShow,
@@ -614,6 +710,7 @@
       dbRange: dbSel.value,
       octaveDivisor: octaveDivisorEl.value,
       octaveAuto: octaveAutoChk.checked,
+      tooltipMode: tooltipModeSel ? tooltipModeSel.value : DEFAULT_SETTINGS.tooltipMode,
       log: logChk.checked,
       peakHold: peakHoldChk ? peakHoldChk.checked : false,
       ...style
@@ -628,6 +725,7 @@
     if (barGradientEndPicker) barGradientEndPicker.value = cfg.barGradientEnd;
     if (barGradientDirSel) barGradientDirSel.value = cfg.barGradientDir;
     if (barLineWidthInput) barLineWidthInput.value = String(cfg.barLineWidth);
+    if (peakHoldColorPicker) peakHoldColorPicker.value = cfg.peakHoldColor;
     if (fftLineColorPicker) fftLineColorPicker.value = cfg.fftLineColor;
     if (fftLineWidthInput) fftLineWidthInput.value = String(cfg.fftLineWidth);
     if (gridShowChk) gridShowChk.checked = !!cfg.gridShow;
@@ -653,6 +751,7 @@
     dbSel.value = cfg.dbRange;
     if (octaveDivisorEl) octaveDivisorEl.value = String(cfg.octaveDivisor);
     if (octaveAutoChk) octaveAutoChk.checked = !!cfg.octaveAuto;
+    if (tooltipModeSel) tooltipModeSel.value = cfg.tooltipMode || DEFAULT_SETTINGS.tooltipMode;
     logChk.checked = !!cfg.log;
     applyStyleValues(cfg);
     updateLogVisibility();
@@ -662,6 +761,22 @@
     }
     if (analyser) setupAnalyser();
     viewSel.dispatchEvent(new Event('change'));
+  }
+
+  function ensureDefaultBanks() {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      Object.keys(DEFAULT_BANKS).forEach((key) => {
+        const bankNum = Number(key);
+        if (!Number.isFinite(bankNum)) return;
+        const storageKey = `${BANK_STORAGE_PREFIX}${bankNum}`;
+        if (!localStorage.getItem(storageKey)) {
+          localStorage.setItem(storageKey, JSON.stringify(DEFAULT_BANKS[bankNum]));
+        }
+      });
+    } catch (e) {
+      logErr('Default bank init failed', e);
+    }
   }
 
   function saveBank(bankNum) {
@@ -763,6 +878,8 @@
       if (!row) return;
       row.style.left = `${left}px`;
       row.style.top = `${Math.round(currentTop)}px`;
+      const maxHeight = Math.max(120, window.innerHeight - currentTop - 8);
+      row.style.maxHeight = `${Math.round(maxHeight)}px`;
       currentTop += row.offsetHeight + 8;
     });
   }
@@ -1008,6 +1125,25 @@
     return `${NOTES[idx]}${octave}`;
   }
 
+  function formatTooltipLabel(freq) {
+    const note = freqToNoteLabel(freq);
+    const hz = `${fmtHz(freq)}Hz`;
+    const mode = tooltipModeSel ? tooltipModeSel.value : DEFAULT_SETTINGS.tooltipMode;
+    switch (mode) {
+      case 'note':
+        return note;
+      case 'hz':
+        return hz;
+      case 'hz-note':
+        return `${hz} ${note}`;
+      case 'off':
+        return '';
+      case 'note-hz':
+      default:
+        return `${note} ${hz}`;
+    }
+  }
+
   function binToHz(i, binCount, sampleRate) {
     const nyq = sampleRate / 2;
     return (i / binCount) * nyq;
@@ -1231,7 +1367,7 @@
     ctx2d.stroke();
 
     if (peakHoldEnabled && fftPeaks) {
-      ctx2d.strokeStyle = '#f7b';
+      ctx2d.strokeStyle = style.peakHoldColor || DEFAULT_SETTINGS.peakHoldColor;
       ctx2d.lineWidth = 1;
       ctx2d.beginPath();
       let startedPeak = false;
@@ -1298,7 +1434,7 @@
         const peak = bandPeaks[i];
         if (peak > 0) {
           const yPeak = Math.max(0, (1 - peak) * h - 2);
-          ctx2d.fillStyle = '#f7b';
+          ctx2d.fillStyle = style.peakHoldColor || DEFAULT_SETTINGS.peakHoldColor;
           ctx2d.fillRect(xx, yPeak, ww, 2);
           ctx2d.fillStyle = barFill;
         }
@@ -1422,6 +1558,9 @@
     analyser.minDecibels = a;
     analyser.maxDecibels = b;
   });
+  if (tooltipModeSel) {
+    tooltipModeSel.addEventListener('change', hideTooltip);
+  }
   if (bankSel) {
     bankSel.addEventListener('change', () => {
       const action = bankSel.value;
@@ -1455,6 +1594,7 @@
     barGradientEndPicker,
     barGradientDirSel,
     barLineWidthInput,
+    peakHoldColorPicker,
     fftLineColorPicker,
     fftLineWidthInput,
     gridShowChk,
@@ -1500,6 +1640,7 @@
   if (octaveAutoChk) octaveAutoChk.addEventListener('change', invalidateBands);
 
   updateAutoOctControlsVisibility();
+  ensureDefaultBanks();
   updateMinHzStep();
   updateLogVisibility();
   toggleMenuPanel(true);
