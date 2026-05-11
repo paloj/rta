@@ -70,7 +70,7 @@
     <button class="menu-tab" data-row="source" aria-pressed="false">Source</button>
     <button class="menu-tab" data-row="behaviour" aria-pressed="false">Behaviour</button>
     <button class="menu-tab" data-row="style" aria-pressed="false">Style</button>
-    <button class="menu-tab" data-row="log" aria-pressed="false">Log</button>
+    <button class="menu-tab" data-row="presets" aria-pressed="false">Presets</button>
     <button class="menu-tab" data-row="help" aria-pressed="false" aria-label="Help">?</button>
   </div>
   <div id="top" class="menu-rows">
@@ -143,45 +143,9 @@
         </label>
         <button id="peakResetBtn" type="button">Reset peaks</button>
       </div>
-      <label title="Load/save preset banks">
-        <span>Presets</span>
-        <select id="bankSel">
-          <option value="">Banks</option>
-          <option value="default">Defaults / Reset</option>
-          <option value="bank-1-load">Load bank 1</option>
-          <option value="bank-2-load">Load bank 2</option>
-          <option value="bank-3-load">Load bank 3</option>
-          <option value="bank-1-save">Save to bank 1</option>
-          <option value="bank-2-save">Save to bank 2</option>
-          <option value="bank-3-save">Save to bank 3</option>
-        </select>
-      </label>
     </div>
     <div id="row-style" class="menu-row hidden">
-      <div class="style-block" title="Visual style and color presets">
-        <label title="Style presets">
-          <span>Style</span>
-          <select id="stylePreset">
-            <option value="" selected>Presets</option>
-            <optgroup label="Bars gradient LR">
-              <option value="bars-gradient-lr-light">Bars LR light</option>
-              <option value="bars-gradient-lr-dark">Bars LR dark</option>
-            </optgroup>
-            <optgroup label="Bars gradient UD">
-              <option value="bars-gradient-ud-light">Bars UD light</option>
-              <option value="bars-gradient-ud-dark">Bars UD dark</option>
-            </optgroup>
-            <optgroup label="FFT palette">
-              <option value="fft-light">FFT light</option>
-              <option value="fft-dark">FFT dark</option>
-            </optgroup>
-            <optgroup label="Background">
-              <option value="bg-light">Background light</option>
-              <option value="bg-dark">Background dark</option>
-            </optgroup>
-            <option value="style-reset">Reset defaults</option>
-          </select>
-        </label>
+      <div class="style-block" title="Visual style and color controls">
         <div class="style-submenu">
           <div class="style-group">
             <span class="style-group-title">Bars</span>
@@ -268,14 +232,52 @@
         </div>
       </div>
     </div>
-    <div id="row-log" class="menu-row hidden">
-      <label title="Show/hide error log panel">
-        <input id="logChk" type="checkbox" />
-        <span>Log</span>
-      </label>
+    <div id="row-presets" class="menu-row hidden">
+      <div class="style-block" title="Load behaviour banks or apply style presets">
+        <label title="Load/save preset banks">
+          <span>Banks</span>
+          <select id="bankSel">
+            <option value="">Banks</option>
+            <option value="default">Defaults / Reset</option>
+            <option value="bank-1-load">Load bank 1</option>
+            <option value="bank-2-load">Load bank 2</option>
+            <option value="bank-3-load">Load bank 3</option>
+            <option value="bank-1-save">Save to bank 1</option>
+            <option value="bank-2-save">Save to bank 2</option>
+            <option value="bank-3-save">Save to bank 3</option>
+          </select>
+        </label>
+        <label title="Style presets">
+          <span>Style</span>
+          <select id="stylePreset">
+            <option value="" selected>Presets</option>
+            <optgroup label="Bars gradient LR">
+              <option value="bars-gradient-lr-light">Bars LR light</option>
+              <option value="bars-gradient-lr-dark">Bars LR dark</option>
+            </optgroup>
+            <optgroup label="Bars gradient UD">
+              <option value="bars-gradient-ud-light">Bars UD light</option>
+              <option value="bars-gradient-ud-dark">Bars UD dark</option>
+            </optgroup>
+            <optgroup label="FFT palette">
+              <option value="fft-light">FFT light</option>
+              <option value="fft-dark">FFT dark</option>
+            </optgroup>
+            <optgroup label="Background">
+              <option value="bg-light">Background light</option>
+              <option value="bg-dark">Background dark</option>
+            </optgroup>
+            <option value="style-reset">Reset defaults</option>
+          </select>
+        </label>
+      </div>
     </div>
     <div id="row-help" class="menu-row hidden">
       <div class="help-panel">
+        <label title="Show/hide error log panel">
+          <input id="logChk" type="checkbox" />
+          <span>Log panel</span>
+        </label>
         <h3>Quick help</h3>
         <ul>
           <li><kbd>Space</kbd> Freeze / resume</li>
@@ -330,7 +332,7 @@
     source: document.getElementById('row-source'),
     behaviour: document.getElementById('row-behaviour'),
     style: document.getElementById('row-style'),
-    log: document.getElementById('row-log'),
+    presets: document.getElementById('row-presets'),
     help: document.getElementById('row-help')
   };
   const freezeBtn = document.getElementById('freezeBtn');
