@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="icon" href="favicon.ico" />
-  <title>Lightweight RTA</title>
+  <title>Lightweight RTA v1.4.0</title>
   <style>
     html, body { margin:0; height:100%; background:#0b0b0b; color:#ddd; font-family:system-ui, sans-serif; }
     body { display:flex; flex-direction:column; }
@@ -68,9 +68,10 @@
   </div>
   <div id="menuPanel" class="hidden" role="group" aria-label="Menu rows">
     <button class="menu-tab" data-row="source" aria-pressed="false">Source</button>
-    <button class="menu-tab" data-row="behaviour" aria-pressed="false">Behaviour</button>
+    <button class="menu-tab" data-row="behaviour" aria-pressed="false">Mode</button>
     <button class="menu-tab" data-row="style" aria-pressed="false">Style</button>
-    <button class="menu-tab" data-row="log" aria-pressed="false">Log</button>
+    <button class="menu-tab" data-row="presets" aria-pressed="false">Presets</button>
+    <button class="menu-tab" data-row="tuning" aria-pressed="false">Tuning</button>
     <button class="menu-tab" data-row="help" aria-pressed="false" aria-label="Help">?</button>
   </div>
   <div id="top" class="menu-rows">
@@ -143,45 +144,9 @@
         </label>
         <button id="peakResetBtn" type="button">Reset peaks</button>
       </div>
-      <label title="Load/save preset banks">
-        <span>Presets</span>
-        <select id="bankSel">
-          <option value="">Banks</option>
-          <option value="default">Defaults / Reset</option>
-          <option value="bank-1-load">Load bank 1</option>
-          <option value="bank-2-load">Load bank 2</option>
-          <option value="bank-3-load">Load bank 3</option>
-          <option value="bank-1-save">Save to bank 1</option>
-          <option value="bank-2-save">Save to bank 2</option>
-          <option value="bank-3-save">Save to bank 3</option>
-        </select>
-      </label>
     </div>
     <div id="row-style" class="menu-row hidden">
-      <div class="style-block" title="Visual style and color presets">
-        <label title="Style presets">
-          <span>Style</span>
-          <select id="stylePreset">
-            <option value="" selected>Presets</option>
-            <optgroup label="Bars gradient LR">
-              <option value="bars-gradient-lr-light">Bars LR light</option>
-              <option value="bars-gradient-lr-dark">Bars LR dark</option>
-            </optgroup>
-            <optgroup label="Bars gradient UD">
-              <option value="bars-gradient-ud-light">Bars UD light</option>
-              <option value="bars-gradient-ud-dark">Bars UD dark</option>
-            </optgroup>
-            <optgroup label="FFT palette">
-              <option value="fft-light">FFT light</option>
-              <option value="fft-dark">FFT dark</option>
-            </optgroup>
-            <optgroup label="Background">
-              <option value="bg-light">Background light</option>
-              <option value="bg-dark">Background dark</option>
-            </optgroup>
-            <option value="style-reset">Reset defaults</option>
-          </select>
-        </label>
+      <div class="style-block" title="Visual style and color controls">
         <div class="style-submenu">
           <div class="style-group">
             <span class="style-group-title">Bars</span>
@@ -268,14 +233,137 @@
         </div>
       </div>
     </div>
-    <div id="row-log" class="menu-row hidden">
-      <label title="Show/hide error log panel">
-        <input id="logChk" type="checkbox" />
-        <span>Log</span>
-      </label>
+    <div id="row-presets" class="menu-row hidden">
+      <div class="style-block" title="Load behaviour banks or apply style presets">
+        <label title="Load/save preset banks">
+          <span>Banks</span>
+          <select id="bankSel">
+            <option value="">Banks</option>
+            <option value="default">Defaults / Reset</option>
+            <option value="bank-1-load">Load bank 1</option>
+            <option value="bank-2-load">Load bank 2</option>
+            <option value="bank-3-load">Load bank 3</option>
+            <option value="bank-1-save">Save to bank 1</option>
+            <option value="bank-2-save">Save to bank 2</option>
+            <option value="bank-3-save">Save to bank 3</option>
+            <optgroup label="Import / Export">
+              <option value="bank-1-export">Export bank 1</option>
+              <option value="bank-2-export">Export bank 2</option>
+              <option value="bank-3-export">Export bank 3</option>
+              <option value="bank-1-import">Import to bank 1</option>
+              <option value="bank-2-import">Import to bank 2</option>
+              <option value="bank-3-import">Import to bank 3</option>
+            </optgroup>
+          </select>
+        </label>
+        <label title="Style presets">
+          <span>Style</span>
+          <select id="stylePreset">
+            <option value="" selected>Presets</option>
+            <optgroup label="Bars gradient LR">
+              <option value="bars-gradient-lr-light">Bars LR light</option>
+              <option value="bars-gradient-lr-dark">Bars LR dark</option>
+            </optgroup>
+            <optgroup label="Bars gradient UD">
+              <option value="bars-gradient-ud-light">Bars UD light</option>
+              <option value="bars-gradient-ud-dark">Bars UD dark</option>
+            </optgroup>
+            <optgroup label="FFT palette">
+              <option value="fft-light">FFT light</option>
+              <option value="fft-dark">FFT dark</option>
+            </optgroup>
+            <optgroup label="Background">
+              <option value="bg-light">Background light</option>
+              <option value="bg-dark">Background dark</option>
+            </optgroup>
+            <option value="style-reset">Reset defaults</option>
+          </select>
+        </label>
+      </div>
+    </div>
+    <div id="row-tuning" class="menu-row hidden">
+      <div class="style-block" title="Signal generators for tuning and measurement">
+        <label title="Allow multiple generators to run at once">
+          <input id="tuningSimulChk" type="checkbox" checked />
+          <span>Simultaneous</span>
+        </label>
+        <label title="Master generator output level (keep low to avoid feedback)">
+          <span>Level</span>
+          <input id="tuningLevel" type="range" min="0" max="0.2" step="0.001" value="0.03" />
+        </label>
+        <div id="tuningPerLevels" class="style-group hidden" title="Separate generator mix levels when simultaneous mode is enabled">
+          <span class="style-group-title">Per source</span>
+          <label title="Pink noise mix level">
+            <span>Pink level</span>
+            <input id="pinkLevel" type="range" min="0" max="1" step="0.01" value="1" />
+          </label>
+          <label title="Sine tone mix level">
+            <span>Sine level</span>
+            <input id="sineLevel" type="range" min="0" max="1" step="0.01" value="1" />
+          </label>
+          <label title="Sine sweep mix level">
+            <span>Sweep level</span>
+            <input id="sweepLevel" type="range" min="0" max="1" step="0.01" value="1" />
+          </label>
+        </div>
+        <label title="Enable pink noise generator">
+          <input id="pinkNoiseChk" type="checkbox" />
+          <span>Pink noise</span>
+        </label>
+        <label title="Enable sine tone generator">
+          <input id="sineToneChk" type="checkbox" />
+          <span>Sine tone</span>
+        </label>
+        <label title="Sine tone pitch mode">
+          <span>Pitch</span>
+          <select id="sinePitchMode">
+            <option value="note" selected>Note</option>
+            <option value="hz">Hz</option>
+          </select>
+        </label>
+        <label id="sineNoteWrap" title="Sine tone note">
+          <span>Note</span>
+          <select id="sineNoteSel">
+            <option>C2</option><option>C#2</option><option>D2</option><option>D#2</option><option>E2</option><option>F2</option><option>F#2</option><option>G2</option><option>G#2</option><option>A2</option><option>A#2</option><option>B2</option>
+            <option>C3</option><option>C#3</option><option>D3</option><option>D#3</option><option>E3</option><option>F3</option><option>F#3</option><option>G3</option><option>G#3</option><option>A3</option><option>A#3</option><option>B3</option>
+            <option>C4</option><option>C#4</option><option>D4</option><option>D#4</option><option>E4</option><option>F4</option><option>F#4</option><option>G4</option><option>G#4</option><option selected>A4</option><option>A#4</option><option>B4</option>
+            <option>C5</option><option>C#5</option><option>D5</option><option>D#5</option><option>E5</option><option>F5</option><option>F#5</option><option>G5</option><option>G#5</option><option>A5</option><option>A#5</option><option>B5</option>
+            <option>C6</option><option>C#6</option><option>D6</option><option>D#6</option><option>E6</option><option>F6</option><option>F#6</option><option>G6</option><option>G#6</option><option>A6</option><option>A#6</option><option>B6</option>
+          </select>
+        </label>
+        <label id="sineHzWrap" class="hidden" title="Sine tone frequency in Hz">
+          <span>Hz</span>
+          <input id="sineHzInput" type="number" min="1" max="24000" step="0.1" value="440" />
+        </label>
+        <span id="sineFreqLabel" class="label">440 Hz</span>
+        <label title="Enable sine sweep generator">
+          <input id="sweepChk" type="checkbox" />
+          <span>Sine sweep</span>
+        </label>
+        <label title="Sweep start frequency">
+          <span>Sweep start Hz</span>
+          <input id="sweepStartHz" type="number" min="1" max="20000" step="1" value="20" />
+        </label>
+        <label title="Sweep end frequency">
+          <span>Sweep end Hz</span>
+          <input id="sweepEndHz" type="number" min="10" max="24000" step="1" value="15000" />
+        </label>
+        <label title="Sweep duration in seconds">
+          <span>Sweep sec</span>
+          <input id="sweepSeconds" type="number" min="1" max="120" step="1" value="12" />
+        </label>
+        <label title="Show current sweep position on the RTA graph">
+          <input id="sweepMarkerChk" type="checkbox" checked />
+          <span>Display sine sweep on RTA</span>
+        </label>
+      </div>
     </div>
     <div id="row-help" class="menu-row hidden">
       <div class="help-panel">
+        <label title="Show/hide error log panel">
+          <input id="logChk" type="checkbox" />
+          <span>Log panel</span>
+        </label>
         <h3>Quick help</h3>
         <ul>
           <li><kbd>Space</kbd> Freeze / resume</li>
@@ -330,7 +418,8 @@
     source: document.getElementById('row-source'),
     behaviour: document.getElementById('row-behaviour'),
     style: document.getElementById('row-style'),
-    log: document.getElementById('row-log'),
+    presets: document.getElementById('row-presets'),
+    tuning: document.getElementById('row-tuning'),
     help: document.getElementById('row-help')
   };
   const freezeBtn = document.getElementById('freezeBtn');
@@ -359,6 +448,25 @@
   const bgGradientStartPicker = document.getElementById('bgGradientStart');
   const bgGradientEndPicker = document.getElementById('bgGradientEnd');
   const bgGradientDirSel = document.getElementById('bgGradientDir');
+  const tuningSimulChk = document.getElementById('tuningSimulChk');
+  const tuningLevelEl = document.getElementById('tuningLevel');
+  const tuningPerLevels = document.getElementById('tuningPerLevels');
+  const pinkLevelEl = document.getElementById('pinkLevel');
+  const sineLevelEl = document.getElementById('sineLevel');
+  const sweepLevelEl = document.getElementById('sweepLevel');
+  const pinkNoiseChk = document.getElementById('pinkNoiseChk');
+  const sineToneChk = document.getElementById('sineToneChk');
+  const sinePitchModeSel = document.getElementById('sinePitchMode');
+  const sineNoteWrap = document.getElementById('sineNoteWrap');
+  const sineNoteSel = document.getElementById('sineNoteSel');
+  const sineHzWrap = document.getElementById('sineHzWrap');
+  const sineHzInput = document.getElementById('sineHzInput');
+  const sineFreqLabel = document.getElementById('sineFreqLabel');
+  const sweepChk = document.getElementById('sweepChk');
+  const sweepStartHzEl = document.getElementById('sweepStartHz');
+  const sweepEndHzEl = document.getElementById('sweepEndHz');
+  const sweepSecondsEl = document.getElementById('sweepSeconds');
+  const sweepMarkerChk = document.getElementById('sweepMarkerChk');
 
   const BANK_STORAGE_PREFIX = 'rta-bank-';
   const DEFAULT_BANKS = {
@@ -468,6 +576,21 @@
     log: false,
     peakHold: false,
     gridShow: true,
+    tuningSimul: true,
+    tuningLevel: '0.03',
+    pinkLevel: '1',
+    sineLevel: '1',
+    sweepLevel: '1',
+    pinkNoise: false,
+    sineTone: false,
+    sinePitchMode: 'note',
+    sineNote: 'A4',
+    sineHz: '440',
+    sweepOn: false,
+    sweepStartHz: '20',
+    sweepEndHz: '15000',
+    sweepSeconds: '12',
+    sweepMarker: true,
     ...STYLE_DEFAULTS
   };
   const STYLE_PRESETS = {
@@ -516,6 +639,15 @@
       backgroundGradientDir: 'lr'
     }
   };
+  const MAX_IMPORT_BYTES = 64 * 1024;
+  const APP_VERSION = '1.4.0';
+  const VALID_VIEWS = ['third', 'autoOctave', 'fft'];
+  const VALID_SCALES = ['log', 'lin'];
+  const VALID_FFT_SIZES = ['1024', '2048', '4096', '8192'];
+  const VALID_DB_RANGES = ['-90,-20', '-80,-20', '-70,-10'];
+  const VALID_TOOLTIP_MODES = ['note-hz', 'note', 'hz', 'hz-note', 'off'];
+  const VALID_GRADIENT_DIRS = ['lr', 'ud'];
+  const VALID_SINE_NOTES = ['C2', 'C#2', 'D2', 'D#2', 'E2', 'F2', 'F#2', 'G2', 'G#2', 'A2', 'A#2', 'B2', 'C3', 'C#3', 'D3', 'D#3', 'E3', 'F3', 'F#3', 'G3', 'G#3', 'A3', 'A#3', 'B3', 'C4', 'C#4', 'D4', 'D#4', 'E4', 'F4', 'F#4', 'G4', 'G#4', 'A4', 'A#4', 'B4', 'C5', 'C#5', 'D5', 'D#5', 'E5', 'F5', 'F#5', 'G5', 'G#5', 'A5', 'A#5', 'B5', 'C6', 'C#6', 'D6', 'D#6', 'E6', 'F6', 'F#6', 'G6', 'G#6', 'A6', 'A#6', 'B6'];
 
   let ac = null, analyser = null, src = null;
   let stream = null;       // original (may contain video)
@@ -529,6 +661,15 @@
   let fftPeaks = null;
   let bandPeaks = null;
   let isFrozen = false;
+  let generatorGain = null;
+  let pinkGainNode = null;
+  let sineGainNode = null;
+  let sweepGainNode = null;
+  let pinkNoiseNode = null;
+  let sineOscNode = null;
+  let sweepOscNode = null;
+  let sweepStartedAt = 0;
+  let sweepCurrentHz = 0;
   const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
   // ---------- Logging ----------
@@ -697,9 +838,139 @@
     };
   }
 
+  function isPlainObject(value) {
+    return !!value && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  function pickEnum(value, allowed, fallback) {
+    return allowed.includes(value) ? value : fallback;
+  }
+
+  function toBoolean(value, fallback) {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value !== 0;
+    if (typeof value === 'string') {
+      const v = value.trim().toLowerCase();
+      if (v === 'true' || v === '1' || v === 'yes' || v === 'on') return true;
+      if (v === 'false' || v === '0' || v === 'no' || v === 'off') return false;
+    }
+    return fallback;
+  }
+
+  function toNumberInRange(value, fallback, min, max) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return fallback;
+    return clamp(parsed, min, max);
+  }
+
+  function toIntInRange(value, fallback, min, max) {
+    const parsed = parseInt(value, 10);
+    if (!Number.isFinite(parsed)) return fallback;
+    return clamp(parsed, min, max);
+  }
+
+  function toHexColor(value, fallback) {
+    if (typeof value !== 'string') return fallback;
+    const v = value.trim();
+    return /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : fallback;
+  }
+
+  function noteToFreq(note) {
+    if (typeof note !== 'string') return 440;
+    const m = note.trim().match(/^([A-G])(#?)(-?\d)$/);
+    if (!m) return 440;
+    const name = `${m[1]}${m[2]}`;
+    const octave = Number(m[3]);
+    const idx = NOTES.indexOf(name);
+    if (idx < 0 || !Number.isFinite(octave)) return 440;
+    const midi = (octave + 1) * 12 + idx;
+    return 440 * Math.pow(2, (midi - 69) / 12);
+  }
+
+  function updateSineFreqLabel() {
+    if (!sineFreqLabel || !sineNoteSel) return;
+    const hz = getSineToneFreq();
+    sineFreqLabel.textContent = `${Math.round(hz * 100) / 100} Hz`;
+  }
+
+  function getSineToneFreq() {
+    const mode = sinePitchModeSel ? sinePitchModeSel.value : DEFAULT_SETTINGS.sinePitchMode;
+    if (mode === 'hz') {
+      const hz = Number(sineHzInput ? sineHzInput.value : DEFAULT_SETTINGS.sineHz);
+      return clamp(Number.isFinite(hz) ? hz : Number(DEFAULT_SETTINGS.sineHz), 1, 24000);
+    }
+    return noteToFreq(sineNoteSel ? sineNoteSel.value : DEFAULT_SETTINGS.sineNote);
+  }
+
+  function updateSinePitchModeUI() {
+    const mode = sinePitchModeSel ? sinePitchModeSel.value : DEFAULT_SETTINGS.sinePitchMode;
+    if (sineNoteWrap) sineNoteWrap.classList.toggle('hidden', mode !== 'note');
+    if (sineHzWrap) sineHzWrap.classList.toggle('hidden', mode !== 'hz');
+  }
+
+  function updateTuningPerLevelsVisibility() {
+    if (!tuningPerLevels) return;
+    const show = !!(tuningSimulChk && tuningSimulChk.checked);
+    tuningPerLevels.classList.toggle('hidden', !show);
+  }
+
+  function normalizeSettings(rawSettings = {}) {
+    const raw = isPlainObject(rawSettings) ? rawSettings : {};
+    const minHz = toNumberInRange(raw.minHz, Number(DEFAULT_SETTINGS.minHz), 0.1, 50000);
+    const maxHzBase = toNumberInRange(raw.maxHz, Number(DEFAULT_SETTINGS.maxHz), 10, 50000);
+    const maxHz = Math.max(maxHzBase, minHz + 1);
+    const smoothingNum = toNumberInRange(raw.smoothing, Number(DEFAULT_SETTINGS.smoothing), 0, 0.999);
+
+    return {
+      view: pickEnum(raw.view, VALID_VIEWS, DEFAULT_SETTINGS.view),
+      scale: pickEnum(raw.scale, VALID_SCALES, DEFAULT_SETTINGS.scale),
+      labels: toBoolean(raw.labels, DEFAULT_SETTINGS.labels),
+      minHz: String(Math.round(minHz * 1000) / 1000),
+      maxHz: String(Math.round(maxHz * 1000) / 1000),
+      fft: pickEnum(String(raw.fft), VALID_FFT_SIZES, DEFAULT_SETTINGS.fft),
+      smoothing: String(Math.round(smoothingNum * 1000) / 1000),
+      dbRange: pickEnum(raw.dbRange, VALID_DB_RANGES, DEFAULT_SETTINGS.dbRange),
+      octaveDivisor: String(toIntInRange(raw.octaveDivisor, Number(DEFAULT_SETTINGS.octaveDivisor), 1, 24)),
+      octaveAuto: toBoolean(raw.octaveAuto, DEFAULT_SETTINGS.octaveAuto),
+      tooltipMode: pickEnum(raw.tooltipMode, VALID_TOOLTIP_MODES, DEFAULT_SETTINGS.tooltipMode),
+      log: toBoolean(raw.log, DEFAULT_SETTINGS.log),
+      peakHold: toBoolean(raw.peakHold, DEFAULT_SETTINGS.peakHold),
+      gridShow: toBoolean(raw.gridShow, DEFAULT_SETTINGS.gridShow),
+      barColor: toHexColor(raw.barColor, DEFAULT_SETTINGS.barColor),
+      barGradientStart: toHexColor(raw.barGradientStart, DEFAULT_SETTINGS.barGradientStart),
+      barGradientEnd: toHexColor(raw.barGradientEnd, DEFAULT_SETTINGS.barGradientEnd),
+      barGradientDir: pickEnum(raw.barGradientDir, VALID_GRADIENT_DIRS, DEFAULT_SETTINGS.barGradientDir),
+      barLineWidth: Math.round(toNumberInRange(raw.barLineWidth, Number(DEFAULT_SETTINGS.barLineWidth), 0, 20) * 10) / 10,
+      peakHoldColor: toHexColor(raw.peakHoldColor, DEFAULT_SETTINGS.peakHoldColor),
+      fftLineColor: toHexColor(raw.fftLineColor, DEFAULT_SETTINGS.fftLineColor),
+      fftLineWidth: Math.round(toNumberInRange(raw.fftLineWidth, Number(DEFAULT_SETTINGS.fftLineWidth), 0.5, 20) * 10) / 10,
+      gridColor: toHexColor(raw.gridColor, DEFAULT_SETTINGS.gridColor),
+      gridLineWidth: Math.round(toNumberInRange(raw.gridLineWidth, Number(DEFAULT_SETTINGS.gridLineWidth), 0.5, 10) * 10) / 10,
+      backgroundColor: toHexColor(raw.backgroundColor, DEFAULT_SETTINGS.backgroundColor),
+      backgroundGradientStart: toHexColor(raw.backgroundGradientStart, DEFAULT_SETTINGS.backgroundGradientStart),
+      backgroundGradientEnd: toHexColor(raw.backgroundGradientEnd, DEFAULT_SETTINGS.backgroundGradientEnd),
+      backgroundGradientDir: pickEnum(raw.backgroundGradientDir, VALID_GRADIENT_DIRS, DEFAULT_SETTINGS.backgroundGradientDir),
+      tuningSimul: toBoolean(raw.tuningSimul, DEFAULT_SETTINGS.tuningSimul),
+      tuningLevel: String(Math.round(toNumberInRange(raw.tuningLevel, Number(DEFAULT_SETTINGS.tuningLevel), 0, 0.2) * 1000) / 1000),
+      pinkLevel: String(Math.round(toNumberInRange(raw.pinkLevel, Number(DEFAULT_SETTINGS.pinkLevel), 0, 1) * 100) / 100),
+      sineLevel: String(Math.round(toNumberInRange(raw.sineLevel, Number(DEFAULT_SETTINGS.sineLevel), 0, 1) * 100) / 100),
+      sweepLevel: String(Math.round(toNumberInRange(raw.sweepLevel, Number(DEFAULT_SETTINGS.sweepLevel), 0, 1) * 100) / 100),
+      pinkNoise: toBoolean(raw.pinkNoise, DEFAULT_SETTINGS.pinkNoise),
+      sineTone: toBoolean(raw.sineTone, DEFAULT_SETTINGS.sineTone),
+      sinePitchMode: pickEnum(raw.sinePitchMode, ['note', 'hz'], DEFAULT_SETTINGS.sinePitchMode),
+      sineNote: pickEnum(raw.sineNote, VALID_SINE_NOTES, DEFAULT_SETTINGS.sineNote),
+      sineHz: String(Math.round(toNumberInRange(raw.sineHz, Number(DEFAULT_SETTINGS.sineHz), 1, 24000) * 10) / 10),
+      sweepOn: toBoolean(raw.sweepOn, DEFAULT_SETTINGS.sweepOn),
+      sweepStartHz: String(Math.round(toNumberInRange(raw.sweepStartHz, Number(DEFAULT_SETTINGS.sweepStartHz), 1, 20000))),
+      sweepEndHz: String(Math.round(toNumberInRange(raw.sweepEndHz, Number(DEFAULT_SETTINGS.sweepEndHz), 10, 24000))),
+      sweepSeconds: String(Math.round(toNumberInRange(raw.sweepSeconds, Number(DEFAULT_SETTINGS.sweepSeconds), 1, 120))),
+      sweepMarker: toBoolean(raw.sweepMarker, DEFAULT_SETTINGS.sweepMarker)
+    };
+  }
+
   function getCurrentSettings() {
     const style = getStyleConfig();
-    return {
+    return normalizeSettings({
       view: viewSel.value,
       scale: scaleSel.value,
       labels: labelsChk.checked,
@@ -713,8 +984,23 @@
       tooltipMode: tooltipModeSel ? tooltipModeSel.value : DEFAULT_SETTINGS.tooltipMode,
       log: logChk.checked,
       peakHold: peakHoldChk ? peakHoldChk.checked : false,
+      tuningSimul: tuningSimulChk ? tuningSimulChk.checked : DEFAULT_SETTINGS.tuningSimul,
+      tuningLevel: tuningLevelEl ? tuningLevelEl.value : DEFAULT_SETTINGS.tuningLevel,
+      pinkLevel: pinkLevelEl ? pinkLevelEl.value : DEFAULT_SETTINGS.pinkLevel,
+      sineLevel: sineLevelEl ? sineLevelEl.value : DEFAULT_SETTINGS.sineLevel,
+      sweepLevel: sweepLevelEl ? sweepLevelEl.value : DEFAULT_SETTINGS.sweepLevel,
+      pinkNoise: pinkNoiseChk ? pinkNoiseChk.checked : DEFAULT_SETTINGS.pinkNoise,
+      sineTone: sineToneChk ? sineToneChk.checked : DEFAULT_SETTINGS.sineTone,
+      sinePitchMode: sinePitchModeSel ? sinePitchModeSel.value : DEFAULT_SETTINGS.sinePitchMode,
+      sineNote: sineNoteSel ? sineNoteSel.value : DEFAULT_SETTINGS.sineNote,
+      sineHz: sineHzInput ? sineHzInput.value : DEFAULT_SETTINGS.sineHz,
+      sweepOn: sweepChk ? sweepChk.checked : DEFAULT_SETTINGS.sweepOn,
+      sweepStartHz: sweepStartHzEl ? sweepStartHzEl.value : DEFAULT_SETTINGS.sweepStartHz,
+      sweepEndHz: sweepEndHzEl ? sweepEndHzEl.value : DEFAULT_SETTINGS.sweepEndHz,
+      sweepSeconds: sweepSecondsEl ? sweepSecondsEl.value : DEFAULT_SETTINGS.sweepSeconds,
+      sweepMarker: sweepMarkerChk ? sweepMarkerChk.checked : DEFAULT_SETTINGS.sweepMarker,
       ...style
-    };
+    });
   }
 
   function applyStyleValues(values = {}) {
@@ -740,7 +1026,7 @@
   }
 
   function applySettings(settings) {
-    const cfg = { ...DEFAULT_SETTINGS, ...settings };
+    const cfg = normalizeSettings(settings);
     viewSel.value = cfg.view;
     scaleSel.value = cfg.scale;
     labelsChk.checked = !!cfg.labels;
@@ -753,7 +1039,26 @@
     if (octaveAutoChk) octaveAutoChk.checked = !!cfg.octaveAuto;
     if (tooltipModeSel) tooltipModeSel.value = cfg.tooltipMode || DEFAULT_SETTINGS.tooltipMode;
     logChk.checked = !!cfg.log;
+    if (tuningSimulChk) tuningSimulChk.checked = !!cfg.tuningSimul;
+    if (tuningLevelEl) tuningLevelEl.value = String(cfg.tuningLevel);
+    if (pinkLevelEl) pinkLevelEl.value = String(cfg.pinkLevel);
+    if (sineLevelEl) sineLevelEl.value = String(cfg.sineLevel);
+    if (sweepLevelEl) sweepLevelEl.value = String(cfg.sweepLevel);
+    if (pinkNoiseChk) pinkNoiseChk.checked = !!cfg.pinkNoise;
+    if (sineToneChk) sineToneChk.checked = !!cfg.sineTone;
+    if (sinePitchModeSel) sinePitchModeSel.value = cfg.sinePitchMode;
+    if (sineNoteSel) sineNoteSel.value = cfg.sineNote;
+    if (sineHzInput) sineHzInput.value = String(cfg.sineHz);
+    if (sweepChk) sweepChk.checked = !!cfg.sweepOn;
+    if (sweepStartHzEl) sweepStartHzEl.value = String(cfg.sweepStartHz);
+    if (sweepEndHzEl) sweepEndHzEl.value = String(cfg.sweepEndHz);
+    if (sweepSecondsEl) sweepSecondsEl.value = String(cfg.sweepSeconds);
+    if (sweepMarkerChk) sweepMarkerChk.checked = !!cfg.sweepMarker;
     applyStyleValues(cfg);
+    updateSinePitchModeUI();
+    updateSineFreqLabel();
+    updateTuningPerLevelsVisibility();
+    triggerGeneratorUpdate('apply-settings');
     updateLogVisibility();
     if (peakHoldChk) {
       peakHoldChk.checked = !!cfg.peakHold;
@@ -771,7 +1076,7 @@
         if (!Number.isFinite(bankNum)) return;
         const storageKey = `${BANK_STORAGE_PREFIX}${bankNum}`;
         if (!localStorage.getItem(storageKey)) {
-          localStorage.setItem(storageKey, JSON.stringify(DEFAULT_BANKS[bankNum]));
+          localStorage.setItem(storageKey, JSON.stringify(normalizeSettings(DEFAULT_BANKS[bankNum])));
         }
       });
     } catch (e) {
@@ -785,7 +1090,8 @@
       return;
     }
     try {
-      localStorage.setItem(`${BANK_STORAGE_PREFIX}${bankNum}`, JSON.stringify(getCurrentSettings()));
+      const sanitized = getCurrentSettings();
+      localStorage.setItem(`${BANK_STORAGE_PREFIX}${bankNum}`, JSON.stringify(sanitized));
       log(`Saved settings to bank ${bankNum}`, 'ok');
     } catch (e) {
       logErr('Saving bank failed', e);
@@ -804,11 +1110,97 @@
     }
     try {
       const data = JSON.parse(serialized);
-      applySettings(data);
+      const sanitized = normalizeSettings(data);
+      localStorage.setItem(`${BANK_STORAGE_PREFIX}${bankNum}`, JSON.stringify(sanitized));
+      applySettings(sanitized);
       log(`Loaded settings from bank ${bankNum}`, 'ok');
     } catch (e) {
       logErr('Loading bank failed', e);
     }
+  }
+
+  function exportBank(bankNum) {
+    if (typeof localStorage === 'undefined') {
+      log('localStorage unavailable; cannot export bank', 'warn');
+      return;
+    }
+    const serialized = localStorage.getItem(`${BANK_STORAGE_PREFIX}${bankNum}`);
+    if (!serialized) {
+      log(`Bank ${bankNum} is empty`, 'warn');
+      return;
+    }
+    try {
+      const parsed = JSON.parse(serialized);
+      const sanitized = normalizeSettings(parsed);
+      const payload = {
+        version: 1,
+        source: 'lightweight-rta',
+        bank: bankNum,
+        exportedAt: new Date().toISOString(),
+        settings: sanitized
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const stamp = payload.exportedAt.replace(/[:.]/g, '-');
+      a.href = url;
+      a.download = `rta-bank-${bankNum}-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      log(`Exported bank ${bankNum}`, 'ok');
+    } catch (e) {
+      logErr('Exporting bank failed', e);
+    }
+  }
+
+  function importBank(bankNum) {
+    if (typeof localStorage === 'undefined') {
+      log('localStorage unavailable; cannot import bank', 'warn');
+      return;
+    }
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json';
+    input.addEventListener('change', async () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      try {
+        if (file.size > MAX_IMPORT_BYTES) {
+          throw new Error(`Import file too large (${file.size} bytes, max ${MAX_IMPORT_BYTES})`);
+        }
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        if (!isPlainObject(parsed)) {
+          throw new Error('Invalid bank file: expected settings object');
+        }
+        let importedSettings = null;
+        if (Object.prototype.hasOwnProperty.call(parsed, 'settings')) {
+          if (parsed.source !== 'lightweight-rta') {
+            throw new Error('Invalid bank file: unsupported source');
+          }
+          if (parsed.version !== 1) {
+            throw new Error('Invalid bank file: unsupported version');
+          }
+          if (!isPlainObject(parsed.settings)) {
+            throw new Error('Invalid bank file: expected settings object');
+          }
+          importedSettings = parsed.settings;
+        } else {
+          importedSettings = parsed;
+          log('Imported legacy bank format (no metadata)', 'warn');
+        }
+        const sanitized = normalizeSettings(importedSettings);
+        localStorage.setItem(`${BANK_STORAGE_PREFIX}${bankNum}`, JSON.stringify(sanitized));
+        applySettings(sanitized);
+        log(`Imported file into bank ${bankNum}`, 'ok');
+      } catch (e) {
+        logErr('Importing bank failed', e);
+      }
+    });
+    input.click();
   }
 
   function handleBankAction(action) {
@@ -824,6 +1216,8 @@
     if (!Number.isFinite(num) || num < 1 || num > 3) return;
     if (op === 'save') saveBank(num);
     else if (op === 'load') loadBank(num);
+    else if (op === 'export') exportBank(num);
+    else if (op === 'import') importBank(num);
   }
 
   if (peakHoldChk) {
@@ -871,7 +1265,9 @@
     });
     const rightSpace = window.innerWidth - panelRect.right - 8;
     const stackRight = rightSpace >= maxWidth;
-    let currentTop = stackRight ? panelRect.top : btnRect.bottom + 8;
+    const portraitMobile = isMobileLayout() && window.innerHeight > window.innerWidth;
+    const menuBottom = Math.max(panelRect.bottom, btnRect.bottom);
+    let currentTop = portraitMobile ? menuBottom + 8 : (stackRight ? panelRect.top : btnRect.bottom + 8);
     const left = stackRight ? Math.round(panelRect.right + 8) : 8;
     visibleKeys.forEach(key => {
       const row = menuRows[key];
@@ -1186,6 +1582,250 @@
     log(`Analyser: fftSize=${analyser.fftSize}, bins=${analyser.frequencyBinCount}`, 'ok');
   }
 
+  async function ensureAudioEngine() {
+    if (!ac) {
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      analyser = ac.createAnalyser();
+      setupAnalyser();
+      log(`AudioContext state=${ac.state}, sampleRate=${ac.sampleRate}`, 'ok');
+    }
+    if (ac.state === 'suspended') {
+      await ac.resume();
+      log(`AudioContext resumed: state=${ac.state}`, 'ok');
+    }
+    if (!raf) draw();
+  }
+
+  function hasActiveGenerators() {
+    return !!(pinkNoiseNode || sineOscNode || sweepOscNode);
+  }
+
+  function updateStopButtonState() {
+    stopBtn.disabled = !(stream || hasActiveGenerators());
+  }
+
+  function ensureGeneratorBus() {
+    if (!ac || !analyser) return null;
+    if (!generatorGain) {
+      generatorGain = ac.createGain();
+      generatorGain.gain.value = Number(tuningLevelEl ? tuningLevelEl.value : DEFAULT_SETTINGS.tuningLevel) || 0.03;
+      generatorGain.connect(analyser);
+      generatorGain.connect(ac.destination);
+    }
+    return generatorGain;
+  }
+
+  function ensureGeneratorSourceGain(kind) {
+    if (!ac) return null;
+    const isSimul = !!(tuningSimulChk && tuningSimulChk.checked);
+    const defaultMix = 1;
+    let node = null;
+    let value = defaultMix;
+    if (kind === 'pink') {
+      if (!pinkGainNode) pinkGainNode = ac.createGain();
+      node = pinkGainNode;
+      value = isSimul ? Number(pinkLevelEl ? pinkLevelEl.value : DEFAULT_SETTINGS.pinkLevel) : defaultMix;
+    } else if (kind === 'sine') {
+      if (!sineGainNode) sineGainNode = ac.createGain();
+      node = sineGainNode;
+      value = isSimul ? Number(sineLevelEl ? sineLevelEl.value : DEFAULT_SETTINGS.sineLevel) : defaultMix;
+    } else if (kind === 'sweep') {
+      if (!sweepGainNode) sweepGainNode = ac.createGain();
+      node = sweepGainNode;
+      value = isSimul ? Number(sweepLevelEl ? sweepLevelEl.value : DEFAULT_SETTINGS.sweepLevel) : defaultMix;
+    }
+    if (!node) return null;
+    node.gain.value = clamp(Number.isFinite(value) ? value : defaultMix, 0, 1);
+    return node;
+  }
+
+  function disconnectAndNull(nodeRefName) {
+    const node = {
+      pink: pinkGainNode,
+      sine: sineGainNode,
+      sweep: sweepGainNode
+    }[nodeRefName];
+    if (node) {
+      try { node.disconnect(); } catch {}
+    }
+    if (nodeRefName === 'pink') pinkGainNode = null;
+    if (nodeRefName === 'sine') sineGainNode = null;
+    if (nodeRefName === 'sweep') sweepGainNode = null;
+  }
+
+  function stopPinkNoise() {
+    if (pinkNoiseNode) {
+      try { pinkNoiseNode.stop(); } catch {}
+      try { pinkNoiseNode.disconnect(); } catch {}
+      pinkNoiseNode = null;
+    }
+    disconnectAndNull('pink');
+  }
+
+  function stopSineTone() {
+    if (sineOscNode) {
+      try { sineOscNode.stop(); } catch {}
+      try { sineOscNode.disconnect(); } catch {}
+      sineOscNode = null;
+    }
+    disconnectAndNull('sine');
+  }
+
+  function stopSweep() {
+    if (sweepOscNode) {
+      try { sweepOscNode.stop(); } catch {}
+      try { sweepOscNode.disconnect(); } catch {}
+      sweepOscNode = null;
+    }
+    disconnectAndNull('sweep');
+    sweepStartedAt = 0;
+    sweepCurrentHz = 0;
+  }
+
+  function createPinkNoiseBuffer(context, seconds = 2) {
+    const sampleRate = context.sampleRate;
+    const length = Math.max(1, Math.floor(sampleRate * seconds));
+    const buffer = context.createBuffer(1, length, sampleRate);
+    const output = buffer.getChannelData(0);
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+    for (let i = 0; i < length; i++) {
+      const white = Math.random() * 2 - 1;
+      b0 = 0.99886 * b0 + white * 0.0555179;
+      b1 = 0.99332 * b1 + white * 0.0750759;
+      b2 = 0.96900 * b2 + white * 0.1538520;
+      b3 = 0.86650 * b3 + white * 0.3104856;
+      b4 = 0.55000 * b4 + white * 0.5329522;
+      b5 = -0.7616 * b5 - white * 0.0168980;
+      const pink = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
+      b6 = white * 0.115926;
+      output[i] = pink * 0.11;
+    }
+    return buffer;
+  }
+
+  function enforceGeneratorPolicy(changedType) {
+    if (!tuningSimulChk || tuningSimulChk.checked) return;
+    if (changedType === 'simul' && tuningSimulChk && !tuningSimulChk.checked) {
+      const firstActive = (pinkNoiseChk && pinkNoiseChk.checked)
+        ? 'pink'
+        : (sineToneChk && sineToneChk.checked)
+          ? 'sine'
+          : (sweepChk && sweepChk.checked)
+            ? 'sweep'
+            : '';
+      if (pinkNoiseChk) pinkNoiseChk.checked = firstActive === 'pink';
+      if (sineToneChk) sineToneChk.checked = firstActive === 'sine';
+      if (sweepChk) sweepChk.checked = firstActive === 'sweep';
+      return;
+    }
+    if (changedType === 'pink' && pinkNoiseChk && pinkNoiseChk.checked) {
+      if (sineToneChk) sineToneChk.checked = false;
+      if (sweepChk) sweepChk.checked = false;
+    }
+    if (changedType === 'sine' && sineToneChk && sineToneChk.checked) {
+      if (pinkNoiseChk) pinkNoiseChk.checked = false;
+      if (sweepChk) sweepChk.checked = false;
+    }
+    if (changedType === 'sweep' && sweepChk && sweepChk.checked) {
+      if (pinkNoiseChk) pinkNoiseChk.checked = false;
+      if (sineToneChk) sineToneChk.checked = false;
+    }
+  }
+
+  async function updateGeneratorState(changedType = '') {
+    enforceGeneratorPolicy(changedType);
+    updateTuningPerLevelsVisibility();
+
+    const wantsPink = !!(pinkNoiseChk && pinkNoiseChk.checked);
+    const wantsSine = !!(sineToneChk && sineToneChk.checked);
+    const wantsSweep = !!(sweepChk && sweepChk.checked);
+    if (!(wantsPink || wantsSine || wantsSweep)) {
+      stopPinkNoise();
+      stopSineTone();
+      stopSweep();
+      updateStopButtonState();
+      return;
+    }
+
+    await ensureAudioEngine();
+    const bus = ensureGeneratorBus();
+    if (!bus) return;
+
+    const level = Number(tuningLevelEl ? tuningLevelEl.value : DEFAULT_SETTINGS.tuningLevel);
+    generatorGain.gain.setTargetAtTime(clamp(level, 0, 0.2), ac.currentTime, 0.02);
+
+    if (wantsPink && !pinkNoiseNode) {
+      pinkNoiseNode = ac.createBufferSource();
+      pinkNoiseNode.buffer = createPinkNoiseBuffer(ac, 2);
+      pinkNoiseNode.loop = true;
+      const pinkGain = ensureGeneratorSourceGain('pink');
+      pinkNoiseNode.connect(pinkGain);
+      pinkGain.connect(bus);
+      pinkNoiseNode.start();
+    } else if (!wantsPink) {
+      stopPinkNoise();
+    }
+    if (pinkGainNode) {
+      pinkGainNode.gain.setTargetAtTime(clamp(Number(pinkLevelEl ? pinkLevelEl.value : DEFAULT_SETTINGS.pinkLevel), 0, 1), ac.currentTime, 0.02);
+    }
+
+    const sineFreq = getSineToneFreq();
+    if (wantsSine && !sineOscNode) {
+      sineOscNode = ac.createOscillator();
+      sineOscNode.type = 'sine';
+      sineOscNode.frequency.setValueAtTime(sineFreq, ac.currentTime);
+      const sineGain = ensureGeneratorSourceGain('sine');
+      sineOscNode.connect(sineGain);
+      sineGain.connect(bus);
+      sineOscNode.start();
+    } else if (!wantsSine) {
+      stopSineTone();
+    }
+    if (sineOscNode) {
+      sineOscNode.frequency.setTargetAtTime(sineFreq, ac.currentTime, 0.02);
+    }
+    if (sineGainNode) {
+      sineGainNode.gain.setTargetAtTime(clamp(Number(sineLevelEl ? sineLevelEl.value : DEFAULT_SETTINGS.sineLevel), 0, 1), ac.currentTime, 0.02);
+    }
+
+    if (wantsSweep && !sweepOscNode) {
+      sweepOscNode = ac.createOscillator();
+      sweepOscNode.type = 'sine';
+      const fStart = Number(sweepStartHzEl ? sweepStartHzEl.value : DEFAULT_SETTINGS.sweepStartHz) || 20;
+      sweepOscNode.frequency.setValueAtTime(clamp(fStart, 1, 24000), ac.currentTime);
+      const sweepGain = ensureGeneratorSourceGain('sweep');
+      sweepOscNode.connect(sweepGain);
+      sweepGain.connect(bus);
+      sweepStartedAt = ac.currentTime;
+      sweepCurrentHz = clamp(fStart, 1, 24000);
+      sweepOscNode.start();
+    } else if (!wantsSweep) {
+      stopSweep();
+    }
+    if (sweepGainNode) {
+      sweepGainNode.gain.setTargetAtTime(clamp(Number(sweepLevelEl ? sweepLevelEl.value : DEFAULT_SETTINGS.sweepLevel), 0, 1), ac.currentTime, 0.02);
+    }
+
+    updateStopButtonState();
+  }
+
+  function updateSweepFrequency() {
+    if (!ac || !sweepOscNode) {
+      sweepCurrentHz = 0;
+      return;
+    }
+    const startHz = clamp(Number(sweepStartHzEl ? sweepStartHzEl.value : DEFAULT_SETTINGS.sweepStartHz) || 20, 1, 24000);
+    const endHz = clamp(Number(sweepEndHzEl ? sweepEndHzEl.value : DEFAULT_SETTINGS.sweepEndHz) || 20000, 10, 24000);
+    const duration = clamp(Number(sweepSecondsEl ? sweepSecondsEl.value : DEFAULT_SETTINGS.sweepSeconds) || 12, 1, 120);
+    const lo = Math.min(startHz, endHz);
+    const hi = Math.max(startHz, endHz);
+    const elapsed = Math.max(0, ac.currentTime - sweepStartedAt);
+    const t = (elapsed % duration) / duration;
+    const hz = lo + t * (hi - lo);
+    sweepCurrentHz = hz;
+    sweepOscNode.frequency.setValueAtTime(hz, ac.currentTime);
+  }
+
   function attachStreamEndHandlers(s, label) {
     if (!s) return;
     const tracks = s.getTracks();
@@ -1203,6 +1843,11 @@
 
     if (src) { try { src.disconnect(); } catch {} }
     if (analyser) { try { analyser.disconnect(); } catch {} }
+    stopPinkNoise();
+    stopSineTone();
+    stopSweep();
+    if (generatorGain) { try { generatorGain.disconnect(); } catch {} }
+    generatorGain = null;
     src = null;
     analyser = null;
 
@@ -1216,7 +1861,10 @@
     ac = null;
 
     data = null;
-    stopBtn.disabled = true;
+    if (pinkNoiseChk) pinkNoiseChk.checked = false;
+    if (sineToneChk) sineToneChk.checked = false;
+    if (sweepChk) sweepChk.checked = false;
+    updateStopButtonState();
     drawIdle();
     log('Stopped', 'warn');
   }
@@ -1224,7 +1872,12 @@
   async function startWithStreams(originalStream) {
     // Defensive: avoid blank page from unhandled exceptions
     try {
-      stop(); // stop any previous run
+      if (src) { try { src.disconnect(); } catch {} }
+      src = null;
+      if (audioStream) { try { audioStream.getTracks().forEach(t => t.stop()); } catch {} }
+      audioStream = null;
+      if (stream) { try { stream.getTracks().forEach(t => t.stop()); } catch {} }
+      stream = null;
 
       stream = originalStream;
 
@@ -1242,22 +1895,12 @@
       attachStreamEndHandlers(stream, 'Capture');
       attachStreamEndHandlers(audioStream, 'Audio');
 
-      ac = new (window.AudioContext || window.webkitAudioContext)();
-      log(`AudioContext state=${ac.state}, sampleRate=${ac.sampleRate}`, 'ok');
-
-      analyser = ac.createAnalyser();
-      setupAnalyser();
-
-      // Some browsers start suspended; resume explicitly (still requires user gesture, which we have via click)
-      if (ac.state === 'suspended') {
-        await ac.resume();
-        log(`AudioContext resumed: state=${ac.state}`, 'ok');
-      }
+      await ensureAudioEngine();
 
       src = ac.createMediaStreamSource(audioStream);
       src.connect(analyser);
 
-      stopBtn.disabled = false;
+      updateStopButtonState();
       draw();
       log('Started', 'ok');
     } catch (e) {
@@ -1476,6 +2119,7 @@
 
       // Guard against race conditions / capture ending
       if (!analyser || !ac || !data) return;
+      updateSweepFrequency();
       if (!isFrozen) analyser.getByteFrequencyData(data);
 
       const w = canvas.width, h = canvas.height;
@@ -1497,6 +2141,21 @@
       else if (viewSel.value === 'autoOctave') drawAutoOctaveBars(w, h, style);
       else drawFftLine(w, h, style);
 
+      if (sweepMarkerChk && sweepMarkerChk.checked && sweepCurrentHz > 0) {
+        const x = hzToX(sweepCurrentHz, ac.sampleRate, w);
+        ctx2d.strokeStyle = '#ffd34d';
+        ctx2d.lineWidth = 2;
+        ctx2d.beginPath();
+        ctx2d.moveTo(x, 0);
+        ctx2d.lineTo(x, h);
+        ctx2d.stroke();
+        ctx2d.fillStyle = '#ffd34d';
+        ctx2d.font = '12px system-ui';
+        ctx2d.textAlign = 'left';
+        ctx2d.textBaseline = 'top';
+        ctx2d.fillText(`Sweep ${fmtHz(sweepCurrentHz)}Hz`, Math.min(w - 130, x + 6), 8);
+      }
+
       // footer
       ctx2d.fillStyle = '#777';
       ctx2d.font = '12px system-ui';
@@ -1505,7 +2164,7 @@
       const { minHz, maxHz } = getHzLimits(ac.sampleRate);
       const viewLabel = viewSel.value === 'third' ? '1/3-oct' : viewSel.value === 'autoOctave' ? '1/x-oct' : 'FFT';
       ctx2d.fillText(
-        `${ac.sampleRate} Hz | ${viewLabel} | ${scaleSel.value.toUpperCase()} | ${Math.round(minHz)}..${Math.round(maxHz)} Hz`,
+        `${ac.sampleRate} Hz | ${viewLabel} | ${scaleSel.value.toUpperCase()} | ${Math.round(minHz)}..${Math.round(maxHz)} Hz | v${APP_VERSION}`,
         10, h - 10
       );
     } catch (e) {
@@ -1588,6 +2247,80 @@
     });
   }
 
+  function triggerGeneratorUpdate(kind = '') {
+    updateGeneratorState(kind).catch((e) => logErr('Generator update failed', e));
+  }
+
+  if (tuningLevelEl) {
+    tuningLevelEl.addEventListener('input', () => {
+      if (generatorGain && ac) {
+        const level = Number(tuningLevelEl.value);
+        generatorGain.gain.setTargetAtTime(clamp(level, 0, 0.2), ac.currentTime, 0.02);
+      }
+    });
+  }
+  if (tuningSimulChk) {
+    tuningSimulChk.addEventListener('change', () => triggerGeneratorUpdate('simul'));
+  }
+  if (pinkLevelEl) {
+    pinkLevelEl.addEventListener('input', () => {
+      if (pinkGainNode && ac) {
+        pinkGainNode.gain.setTargetAtTime(clamp(Number(pinkLevelEl.value), 0, 1), ac.currentTime, 0.02);
+      }
+    });
+  }
+  if (sineLevelEl) {
+    sineLevelEl.addEventListener('input', () => {
+      if (sineGainNode && ac) {
+        sineGainNode.gain.setTargetAtTime(clamp(Number(sineLevelEl.value), 0, 1), ac.currentTime, 0.02);
+      }
+    });
+  }
+  if (sweepLevelEl) {
+    sweepLevelEl.addEventListener('input', () => {
+      if (sweepGainNode && ac) {
+        sweepGainNode.gain.setTargetAtTime(clamp(Number(sweepLevelEl.value), 0, 1), ac.currentTime, 0.02);
+      }
+    });
+  }
+  if (pinkNoiseChk) {
+    pinkNoiseChk.addEventListener('change', () => triggerGeneratorUpdate('pink'));
+  }
+  if (sineToneChk) {
+    sineToneChk.addEventListener('change', () => triggerGeneratorUpdate('sine'));
+  }
+  if (sinePitchModeSel) {
+    sinePitchModeSel.addEventListener('change', () => {
+      updateSinePitchModeUI();
+      updateSineFreqLabel();
+      triggerGeneratorUpdate('sine-pitch');
+    });
+  }
+  if (sineNoteSel) {
+    sineNoteSel.addEventListener('change', () => {
+      updateSineFreqLabel();
+      triggerGeneratorUpdate('sine-note');
+    });
+  }
+  if (sineHzInput) {
+    sineHzInput.addEventListener('input', () => {
+      updateSineFreqLabel();
+      triggerGeneratorUpdate('sine-hz');
+    });
+  }
+  if (sweepChk) {
+    sweepChk.addEventListener('change', () => triggerGeneratorUpdate('sweep'));
+  }
+  if (sweepStartHzEl) {
+    sweepStartHzEl.addEventListener('input', () => triggerGeneratorUpdate('sweep-params'));
+  }
+  if (sweepEndHzEl) {
+    sweepEndHzEl.addEventListener('input', () => triggerGeneratorUpdate('sweep-params'));
+  }
+  if (sweepSecondsEl) {
+    sweepSecondsEl.addEventListener('input', () => triggerGeneratorUpdate('sweep-params'));
+  }
+
   const styleReactiveElements = [
     barColorPicker,
     barGradientStartPicker,
@@ -1642,12 +2375,16 @@
   updateAutoOctControlsVisibility();
   ensureDefaultBanks();
   updateMinHzStep();
+  updateTuningPerLevelsVisibility();
+  updateSinePitchModeUI();
+  updateSineFreqLabel();
   updateLogVisibility();
   toggleMenuPanel(true);
   setRowVisible('source', true);
   setMenuCollapsedState(false);
+  updateStopButtonState();
   drawIdle();
-  log('Ready', 'ok');
+  log(`Ready v${APP_VERSION}`, 'ok');
     setFreezeState(false);
 
   document.addEventListener('keydown', (ev) => {
