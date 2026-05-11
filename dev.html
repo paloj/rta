@@ -245,6 +245,14 @@
             <option value="bank-1-save">Save to bank 1</option>
             <option value="bank-2-save">Save to bank 2</option>
             <option value="bank-3-save">Save to bank 3</option>
+            <optgroup label="Import / Export">
+              <option value="bank-1-export">Export bank 1</option>
+              <option value="bank-2-export">Export bank 2</option>
+              <option value="bank-3-export">Export bank 3</option>
+              <option value="bank-1-import">Import to bank 1</option>
+              <option value="bank-2-import">Import to bank 2</option>
+              <option value="bank-3-import">Import to bank 3</option>
+            </optgroup>
           </select>
         </label>
         <label title="Style presets">
@@ -518,6 +526,13 @@
       backgroundGradientDir: 'lr'
     }
   };
+  const MAX_IMPORT_BYTES = 64 * 1024;
+  const VALID_VIEWS = ['third', 'autoOctave', 'fft'];
+  const VALID_SCALES = ['log', 'lin'];
+  const VALID_FFT_SIZES = ['1024', '2048', '4096', '8192'];
+  const VALID_DB_RANGES = ['-90,-20', '-80,-20', '-70,-10'];
+  const VALID_TOOLTIP_MODES = ['note-hz', 'note', 'hz', 'hz-note', 'off'];
+  const VALID_GRADIENT_DIRS = ['lr', 'ud'];
 
   let ac = null, analyser = null, src = null;
   let stream = null;       // original (may contain video)
@@ -699,9 +714,85 @@
     };
   }
 
+  function isPlainObject(value) {
+    return !!value && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  function pickEnum(value, allowed, fallback) {
+    return allowed.includes(value) ? value : fallback;
+  }
+
+  function toBoolean(value, fallback) {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value !== 0;
+    if (typeof value === 'string') {
+      const v = value.trim().toLowerCase();
+      if (v === 'true' || v === '1' || v === 'yes' || v === 'on') return true;
+      if (v === 'false' || v === '0' || v === 'no' || v === 'off') return false;
+    }
+    return fallback;
+  }
+
+  function toNumberInRange(value, fallback, min, max) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return fallback;
+    return clamp(parsed, min, max);
+  }
+
+  function toIntInRange(value, fallback, min, max) {
+    const parsed = parseInt(value, 10);
+    if (!Number.isFinite(parsed)) return fallback;
+    return clamp(parsed, min, max);
+  }
+
+  function toHexColor(value, fallback) {
+    if (typeof value !== 'string') return fallback;
+    const v = value.trim();
+    return /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : fallback;
+  }
+
+  function normalizeSettings(rawSettings = {}) {
+    const raw = isPlainObject(rawSettings) ? rawSettings : {};
+    const minHz = toNumberInRange(raw.minHz, Number(DEFAULT_SETTINGS.minHz), 0.1, 50000);
+    const maxHzBase = toNumberInRange(raw.maxHz, Number(DEFAULT_SETTINGS.maxHz), 10, 50000);
+    const maxHz = Math.max(maxHzBase, minHz + 1);
+    const smoothingNum = toNumberInRange(raw.smoothing, Number(DEFAULT_SETTINGS.smoothing), 0, 0.999);
+
+    return {
+      view: pickEnum(raw.view, VALID_VIEWS, DEFAULT_SETTINGS.view),
+      scale: pickEnum(raw.scale, VALID_SCALES, DEFAULT_SETTINGS.scale),
+      labels: toBoolean(raw.labels, DEFAULT_SETTINGS.labels),
+      minHz: String(Math.round(minHz * 1000) / 1000),
+      maxHz: String(Math.round(maxHz * 1000) / 1000),
+      fft: pickEnum(String(raw.fft), VALID_FFT_SIZES, DEFAULT_SETTINGS.fft),
+      smoothing: String(Math.round(smoothingNum * 1000) / 1000),
+      dbRange: pickEnum(raw.dbRange, VALID_DB_RANGES, DEFAULT_SETTINGS.dbRange),
+      octaveDivisor: String(toIntInRange(raw.octaveDivisor, Number(DEFAULT_SETTINGS.octaveDivisor), 1, 24)),
+      octaveAuto: toBoolean(raw.octaveAuto, DEFAULT_SETTINGS.octaveAuto),
+      tooltipMode: pickEnum(raw.tooltipMode, VALID_TOOLTIP_MODES, DEFAULT_SETTINGS.tooltipMode),
+      log: toBoolean(raw.log, DEFAULT_SETTINGS.log),
+      peakHold: toBoolean(raw.peakHold, DEFAULT_SETTINGS.peakHold),
+      gridShow: toBoolean(raw.gridShow, DEFAULT_SETTINGS.gridShow),
+      barColor: toHexColor(raw.barColor, DEFAULT_SETTINGS.barColor),
+      barGradientStart: toHexColor(raw.barGradientStart, DEFAULT_SETTINGS.barGradientStart),
+      barGradientEnd: toHexColor(raw.barGradientEnd, DEFAULT_SETTINGS.barGradientEnd),
+      barGradientDir: pickEnum(raw.barGradientDir, VALID_GRADIENT_DIRS, DEFAULT_SETTINGS.barGradientDir),
+      barLineWidth: Math.round(toNumberInRange(raw.barLineWidth, Number(DEFAULT_SETTINGS.barLineWidth), 0, 20) * 10) / 10,
+      peakHoldColor: toHexColor(raw.peakHoldColor, DEFAULT_SETTINGS.peakHoldColor),
+      fftLineColor: toHexColor(raw.fftLineColor, DEFAULT_SETTINGS.fftLineColor),
+      fftLineWidth: Math.round(toNumberInRange(raw.fftLineWidth, Number(DEFAULT_SETTINGS.fftLineWidth), 0.5, 20) * 10) / 10,
+      gridColor: toHexColor(raw.gridColor, DEFAULT_SETTINGS.gridColor),
+      gridLineWidth: Math.round(toNumberInRange(raw.gridLineWidth, Number(DEFAULT_SETTINGS.gridLineWidth), 0.5, 10) * 10) / 10,
+      backgroundColor: toHexColor(raw.backgroundColor, DEFAULT_SETTINGS.backgroundColor),
+      backgroundGradientStart: toHexColor(raw.backgroundGradientStart, DEFAULT_SETTINGS.backgroundGradientStart),
+      backgroundGradientEnd: toHexColor(raw.backgroundGradientEnd, DEFAULT_SETTINGS.backgroundGradientEnd),
+      backgroundGradientDir: pickEnum(raw.backgroundGradientDir, VALID_GRADIENT_DIRS, DEFAULT_SETTINGS.backgroundGradientDir)
+    };
+  }
+
   function getCurrentSettings() {
     const style = getStyleConfig();
-    return {
+    return normalizeSettings({
       view: viewSel.value,
       scale: scaleSel.value,
       labels: labelsChk.checked,
@@ -716,7 +807,7 @@
       log: logChk.checked,
       peakHold: peakHoldChk ? peakHoldChk.checked : false,
       ...style
-    };
+    });
   }
 
   function applyStyleValues(values = {}) {
@@ -742,7 +833,7 @@
   }
 
   function applySettings(settings) {
-    const cfg = { ...DEFAULT_SETTINGS, ...settings };
+    const cfg = normalizeSettings(settings);
     viewSel.value = cfg.view;
     scaleSel.value = cfg.scale;
     labelsChk.checked = !!cfg.labels;
@@ -773,7 +864,7 @@
         if (!Number.isFinite(bankNum)) return;
         const storageKey = `${BANK_STORAGE_PREFIX}${bankNum}`;
         if (!localStorage.getItem(storageKey)) {
-          localStorage.setItem(storageKey, JSON.stringify(DEFAULT_BANKS[bankNum]));
+          localStorage.setItem(storageKey, JSON.stringify(normalizeSettings(DEFAULT_BANKS[bankNum])));
         }
       });
     } catch (e) {
@@ -787,7 +878,8 @@
       return;
     }
     try {
-      localStorage.setItem(`${BANK_STORAGE_PREFIX}${bankNum}`, JSON.stringify(getCurrentSettings()));
+      const sanitized = getCurrentSettings();
+      localStorage.setItem(`${BANK_STORAGE_PREFIX}${bankNum}`, JSON.stringify(sanitized));
       log(`Saved settings to bank ${bankNum}`, 'ok');
     } catch (e) {
       logErr('Saving bank failed', e);
@@ -806,11 +898,97 @@
     }
     try {
       const data = JSON.parse(serialized);
-      applySettings(data);
+      const sanitized = normalizeSettings(data);
+      localStorage.setItem(`${BANK_STORAGE_PREFIX}${bankNum}`, JSON.stringify(sanitized));
+      applySettings(sanitized);
       log(`Loaded settings from bank ${bankNum}`, 'ok');
     } catch (e) {
       logErr('Loading bank failed', e);
     }
+  }
+
+  function exportBank(bankNum) {
+    if (typeof localStorage === 'undefined') {
+      log('localStorage unavailable; cannot export bank', 'warn');
+      return;
+    }
+    const serialized = localStorage.getItem(`${BANK_STORAGE_PREFIX}${bankNum}`);
+    if (!serialized) {
+      log(`Bank ${bankNum} is empty`, 'warn');
+      return;
+    }
+    try {
+      const parsed = JSON.parse(serialized);
+      const sanitized = normalizeSettings(parsed);
+      const payload = {
+        version: 1,
+        source: 'lightweight-rta',
+        bank: bankNum,
+        exportedAt: new Date().toISOString(),
+        settings: sanitized
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const stamp = payload.exportedAt.replace(/[:.]/g, '-');
+      a.href = url;
+      a.download = `rta-bank-${bankNum}-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      log(`Exported bank ${bankNum}`, 'ok');
+    } catch (e) {
+      logErr('Exporting bank failed', e);
+    }
+  }
+
+  function importBank(bankNum) {
+    if (typeof localStorage === 'undefined') {
+      log('localStorage unavailable; cannot import bank', 'warn');
+      return;
+    }
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json';
+    input.addEventListener('change', async () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      try {
+        if (file.size > MAX_IMPORT_BYTES) {
+          throw new Error(`Import file too large (${file.size} bytes, max ${MAX_IMPORT_BYTES})`);
+        }
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        if (!isPlainObject(parsed)) {
+          throw new Error('Invalid bank file: expected settings object');
+        }
+        let importedSettings = null;
+        if (Object.prototype.hasOwnProperty.call(parsed, 'settings')) {
+          if (parsed.source !== 'lightweight-rta') {
+            throw new Error('Invalid bank file: unsupported source');
+          }
+          if (parsed.version !== 1) {
+            throw new Error('Invalid bank file: unsupported version');
+          }
+          if (!isPlainObject(parsed.settings)) {
+            throw new Error('Invalid bank file: expected settings object');
+          }
+          importedSettings = parsed.settings;
+        } else {
+          importedSettings = parsed;
+          log('Imported legacy bank format (no metadata)', 'warn');
+        }
+        const sanitized = normalizeSettings(importedSettings);
+        localStorage.setItem(`${BANK_STORAGE_PREFIX}${bankNum}`, JSON.stringify(sanitized));
+        applySettings(sanitized);
+        log(`Imported file into bank ${bankNum}`, 'ok');
+      } catch (e) {
+        logErr('Importing bank failed', e);
+      }
+    });
+    input.click();
   }
 
   function handleBankAction(action) {
@@ -826,6 +1004,8 @@
     if (!Number.isFinite(num) || num < 1 || num > 3) return;
     if (op === 'save') saveBank(num);
     else if (op === 'load') loadBank(num);
+    else if (op === 'export') exportBank(num);
+    else if (op === 'import') importBank(num);
   }
 
   if (peakHoldChk) {
